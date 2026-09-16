@@ -6,7 +6,7 @@
 (function () {
     'use strict';
 
-    var DEFAULT_STORAGE_KEY = 'booksTableColumnWidths_v1';
+    var DEFAULT_STORAGE_KEY = 'booksTableColumnWidths_v2';
     var MIN_W = 48;
     var MAX_W = 640;
 
@@ -16,7 +16,7 @@
         }
         var k = table.getAttribute('data-books-column-resize-key');
         if (k) {
-            return 'booksLookerTableColumnWidths_' + k + '_v1';
+            return 'booksLookerTableColumnWidths_' + k + '_v2';
         }
         return DEFAULT_STORAGE_KEY;
     }
@@ -43,6 +43,7 @@
             var widths = JSON.parse(raw);
             if (!Array.isArray(widths)) return;
             var n = table.querySelectorAll('thead tr th').length;
+            if (widths.length !== n) return;
             for (var i = 0; i < n && i < widths.length; i++) {
                 if (typeof widths[i] === 'number' && widths[i] > 0) {
                     applyColumnWidth(table, i, widths[i]);

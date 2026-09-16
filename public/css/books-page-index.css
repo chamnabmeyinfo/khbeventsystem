@@ -138,6 +138,53 @@ body.books-table-resizing {
     color: var(--text-secondary);
     width: 4.5rem;
 }
+.books-page .books-looker-table .books-col-team {
+    text-align: center;
+    width: 6.5rem;
+    min-width: 5.5rem;
+}
+.books-team-cell {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    margin: 0 auto;
+    max-width: 100%;
+}
+.books-team-link {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none !important;
+    color: inherit;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.books-team-link:hover {
+    transform: translateY(-1px);
+    opacity: 0.9;
+}
+.books-team-link:hover .books-team-name {
+    color: var(--accent-blue, #0d6efd);
+}
+.books-team-avatar-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 3px;
+}
+.books-team-name {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-primary, #2d3748);
+    line-height: 1.2;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+}
 .books-page .books-looker-table .books-col-actions {
     width: 1%;
     white-space: nowrap;

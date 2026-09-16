@@ -23,6 +23,7 @@
                                     <th scope="col">Row</th>
                                     <th>ID</th>
                                     <th>Client</th>
+                                    <th class="text-center">Team</th>
                                     <th>Floor Plan</th>
                                     <th>Date</th>
                                     <th>Booths</th>
@@ -65,6 +66,7 @@
                             <th scope="col">Row</th>
                             <th>ID</th>
                             <th>Client</th>
+                            <th class="text-center">Team</th>
                             <th>Floor Plan</th>
                             <th>Date</th>
                             <th>Booths</th>
@@ -79,7 +81,7 @@
                             @include('books.partials.table-row', ['book' => $book, 'rowNumber' => $loop->iteration])
                         @empty
                             <tr>
-                                <td colspan="10" class="text-center py-5">
+                                <td colspan="11" class="text-center py-5">
                                     <div class="empty-state">
                                         <i class="fas fa-inbox empty-state-icon"></i>
                                         <h3>No bookings found</h3>

@@ -254,6 +254,25 @@ class User extends Authenticatable
     }
 
     /**
+     * Get user display name (full employee name if available, otherwise username)
+     */
+    public function getDisplayNameAttribute(): string
+    {
+        if (! empty($this->attributes['name'])) {
+            return $this->attributes['name'];
+        }
+
+        if ($this->relationLoaded('employee') && $this->employee) {
+            $fullName = trim(($this->employee->first_name ?? '') . ' ' . ($this->employee->last_name ?? ''));
+            if (! empty($fullName)) {
+                return $fullName;
+            }
+        }
+
+        return $this->username ?? ('User #' . $this->id);
+    }
+
+    /**
      * Check if user has a specific permission
      * Optimized to load role and permissions efficiently
      */

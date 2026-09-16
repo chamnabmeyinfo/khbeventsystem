@@ -36,8 +36,46 @@
         @else
             <span class="text-muted">N/A</span>
         @endif
+    </td>
+    <td class="books-col-team text-center">
         @if($book->user)
-            <br><small class="text-muted" title="Booked by"><i class="fas fa-user-tag me-1"></i>{{ $book->user->username }}</small>
+            @php
+                $u = $book->user;
+                $uName = $u->display_name ?? $u->username;
+            @endphp
+            <div class="books-team-cell">
+                @if(auth()->user()->isAdmin())
+                    <a href="{{ route('users.show', $u) }}" onclick="event.stopPropagation()" class="books-team-link" title="View Team Member: {{ $uName }} ({{ $u->username }})">
+                        <div class="books-team-avatar-wrap">
+                            <x-avatar
+                                :avatar="$u->avatar"
+                                :name="$u->username"
+                                size="34px"
+                                :type="$u->isAdmin() ? 'admin' : 'user'"
+                                shape="circle"
+                            />
+                        </div>
+                        <span class="books-team-name text-truncate">
+                            {{ $uName }}
+                        </span>
+                    </a>
+                @else
+                    <div class="books-team-avatar-wrap">
+                        <x-avatar
+                            :avatar="$u->avatar"
+                            :name="$u->username"
+                            size="34px"
+                            :type="$u->isAdmin() ? 'admin' : 'user'"
+                            shape="circle"
+                        />
+                    </div>
+                    <span class="books-team-name text-truncate" title="{{ $uName }}">
+                        {{ $uName }}
+                    </span>
+                @endif
+            </div>
+        @else
+            <span class="text-muted small">—</span>
         @endif
     </td>
     <td>
