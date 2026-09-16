@@ -541,6 +541,9 @@ function calculateSplitTotal() {
     const prod = parseFloat(document.getElementById('product_amount').value) || 0;
     const total = cash + prod;
 
+    const amtInput = document.getElementById('amount');
+    if (amtInput) amtInput.value = total.toFixed(2);
+
     document.getElementById('calcCashDisplay').textContent = `$${cash.toFixed(2)}`;
     document.getElementById('calcProductDisplay').textContent = `$${prod.toFixed(2)}`;
     document.getElementById('calcTotalDisplay').textContent = `$${total.toFixed(2)}`;

@@ -505,9 +505,13 @@ function updateLiveCalc() {
         cash = parseFloat(document.getElementById('cash_amount').value) || 0;
         product = parseFloat(document.getElementById('product_amount').value) || 0;
         total = cash + product;
+        const amtInput = document.getElementById('amount');
+        if (amtInput) amtInput.value = total.toFixed(2);
     } else if (isProduct) {
         product = parseFloat(document.getElementById('product_amount').value) || 0;
         total = product;
+        const amtInput = document.getElementById('amount');
+        if (amtInput) amtInput.value = total.toFixed(2);
     }
 
     document.getElementById('calcCashPortion').textContent = '$' + cash.toFixed(2);

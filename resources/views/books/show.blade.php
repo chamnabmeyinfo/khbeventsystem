@@ -694,7 +694,7 @@
                             <div class="col-md-4 mb-2 mb-md-0">
                                 <div class="payment-structure-card-modal active" id="modalRecCardStandard" onclick="setQuickRecordStructure('standard')">
                                     <div class="custom-control custom-radio">
-                                        <input type="radio" id="modal_rec_standard" name="payment_structure" value="standard" class="custom-control-input" checked>
+                                        <input type="radio" id="modal_rec_standard" name="payment_structure" value="standard" class="custom-control-input" onchange="setQuickRecordStructure('standard')" checked>
                                         <label class="custom-control-label font-weight-bold" for="modal_rec_standard">
                                             <i class="fas fa-money-bill-wave text-success mr-1"></i>Standard Money
                                         </label>
@@ -705,7 +705,7 @@
                             <div class="col-md-4 mb-2 mb-md-0">
                                 <div class="payment-structure-card-modal" id="modalRecCardSplit" onclick="setQuickRecordStructure('split')">
                                     <div class="custom-control custom-radio">
-                                        <input type="radio" id="modal_rec_split" name="payment_structure" value="split" class="custom-control-input">
+                                        <input type="radio" id="modal_rec_split" name="payment_structure" value="split" class="custom-control-input" onchange="setQuickRecordStructure('split')">
                                         <label class="custom-control-label font-weight-bold" for="modal_rec_split">
                                             <i class="fas fa-layer-group text-primary mr-1"></i>Split Payment
                                         </label>
@@ -716,7 +716,7 @@
                             <div class="col-md-4">
                                 <div class="payment-structure-card-modal" id="modalRecCardProduct" onclick="setQuickRecordStructure('product_exchange')">
                                     <div class="custom-control custom-radio">
-                                        <input type="radio" id="modal_rec_product" name="payment_structure" value="product_exchange" class="custom-control-input">
+                                        <input type="radio" id="modal_rec_product" name="payment_structure" value="product_exchange" class="custom-control-input" onchange="setQuickRecordStructure('product_exchange')">
                                         <label class="custom-control-label font-weight-bold" for="modal_rec_product">
                                             <i class="fas fa-boxes text-info mr-1"></i>Product Exchange
                                         </label>
@@ -918,7 +918,7 @@
                             <div class="col-md-4 mb-2 mb-md-0">
                                 <div class="payment-structure-card-modal active" id="modalEditCardStandard" onclick="setEditStructure('standard')">
                                     <div class="custom-control custom-radio">
-                                        <input type="radio" id="modal_edit_standard" name="payment_structure" value="standard" class="custom-control-input" checked>
+                                        <input type="radio" id="modal_edit_standard" name="payment_structure" value="standard" class="custom-control-input" onchange="setEditStructure('standard')" checked>
                                         <label class="custom-control-label font-weight-bold" for="modal_edit_standard">
                                             <i class="fas fa-money-bill-wave text-success mr-1"></i>Standard Money
                                         </label>
@@ -929,7 +929,7 @@
                             <div class="col-md-4 mb-2 mb-md-0">
                                 <div class="payment-structure-card-modal" id="modalEditCardSplit" onclick="setEditStructure('split')">
                                     <div class="custom-control custom-radio">
-                                        <input type="radio" id="modal_edit_split" name="payment_structure" value="split" class="custom-control-input">
+                                        <input type="radio" id="modal_edit_split" name="payment_structure" value="split" class="custom-control-input" onchange="setEditStructure('split')">
                                         <label class="custom-control-label font-weight-bold" for="modal_edit_split">
                                             <i class="fas fa-layer-group text-primary mr-1"></i>Split Payment
                                         </label>
@@ -940,7 +940,7 @@
                             <div class="col-md-4">
                                 <div class="payment-structure-card-modal" id="modalEditCardProduct" onclick="setEditStructure('product_exchange')">
                                     <div class="custom-control custom-radio">
-                                        <input type="radio" id="modal_edit_product" name="payment_structure" value="product_exchange" class="custom-control-input">
+                                        <input type="radio" id="modal_edit_product" name="payment_structure" value="product_exchange" class="custom-control-input" onchange="setEditStructure('product_exchange')">
                                         <label class="custom-control-label font-weight-bold" for="modal_edit_product">
                                             <i class="fas fa-boxes text-info mr-1"></i>Product Exchange
                                         </label>
@@ -1357,6 +1357,14 @@ function deleteBooking(id) {
 // ==========================================
 
 function setQuickRecordStructure(structure) {
+    const radStandard = document.getElementById('modal_rec_standard');
+    const radSplit = document.getElementById('modal_rec_split');
+    const radProduct = document.getElementById('modal_rec_product');
+
+    if (radStandard) radStandard.checked = (structure === 'standard');
+    if (radSplit) radSplit.checked = (structure === 'split');
+    if (radProduct) radProduct.checked = (structure === 'product_exchange');
+
     document.getElementById('modalRecCardStandard')?.classList.toggle('active', structure === 'standard');
     document.getElementById('modalRecCardSplit')?.classList.toggle('active', structure === 'split');
     document.getElementById('modalRecCardProduct')?.classList.toggle('active', structure === 'product_exchange');
@@ -1454,9 +1462,13 @@ function updateQuickRecCalc() {
         cash = parseFloat(document.getElementById('modal_rec_cash_amount')?.value) || 0;
         product = parseFloat(document.getElementById('modal_rec_product_amount')?.value) || 0;
         total = cash + product;
+        const amtInput = document.getElementById('modal_rec_amount');
+        if (amtInput) amtInput.value = total.toFixed(2);
     } else if (isProduct) {
         product = parseFloat(document.getElementById('modal_rec_product_amount')?.value) || 0;
         total = product;
+        const amtInput = document.getElementById('modal_rec_amount');
+        if (amtInput) amtInput.value = total.toFixed(2);
     }
 
     const badge = document.getElementById('modalRecTotalCredited');
@@ -1502,6 +1514,14 @@ function quickFillRecBalance() {
 }
 
 function setEditStructure(structure) {
+    const radStandard = document.getElementById('modal_edit_standard');
+    const radSplit = document.getElementById('modal_edit_split');
+    const radProduct = document.getElementById('modal_edit_product');
+
+    if (radStandard) radStandard.checked = (structure === 'standard');
+    if (radSplit) radSplit.checked = (structure === 'split');
+    if (radProduct) radProduct.checked = (structure === 'product_exchange');
+
     document.getElementById('modalEditCardStandard')?.classList.toggle('active', structure === 'standard');
     document.getElementById('modalEditCardSplit')?.classList.toggle('active', structure === 'split');
     document.getElementById('modalEditCardProduct')?.classList.toggle('active', structure === 'product_exchange');
@@ -1599,9 +1619,13 @@ function updateEditCalc() {
         cash = parseFloat(document.getElementById('modal_edit_cash_amount')?.value) || 0;
         product = parseFloat(document.getElementById('modal_edit_product_amount')?.value) || 0;
         total = cash + product;
+        const amtInput = document.getElementById('modal_edit_amount');
+        if (amtInput) amtInput.value = total.toFixed(2);
     } else if (isProduct) {
         product = parseFloat(document.getElementById('modal_edit_product_amount')?.value) || 0;
         total = product;
+        const amtInput = document.getElementById('modal_edit_amount');
+        if (amtInput) amtInput.value = total.toFixed(2);
     }
 
     const badge = document.getElementById('modalEditTotalCredited');
@@ -1632,7 +1656,7 @@ function openEditPaymentModal(payment) {
     document.getElementById('editPaymentModalForm').action = `/finance/payments/${payment.id}`;
     document.getElementById('modalEditFullPageLink').href = `/finance/payments/${payment.id}/edit`;
 
-    const isSplit = (payment.payment_method === 'split' || (payment.cash_amount > 0 && payment.product_amount > 0));
+    const isSplit = (payment.payment_method === 'split' || (parseFloat(payment.cash_amount) > 0 && parseFloat(payment.product_amount) > 0) || parseFloat(payment.product_quantity) > 0);
     const isProduct = (payment.payment_method === 'product_exchange');
     const structure = isSplit ? 'split' : (isProduct ? 'product_exchange' : 'standard');
 
