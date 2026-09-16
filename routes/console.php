@@ -69,19 +69,3 @@ Artisan::command('khb:sync-all-bookings', function () {
     $this->info("Successfully re-calculated payment amounts and balances for {$count} bookings.");
 });
 
-Artisan::command('khb:test-table-row {id=829}', function ($id) {
-    $b = \App\Models\Book::with('user', 'client', 'floorPlan')->find($id);
-    if (!$b) {
-        $this->error("Booking not found");
-        return;
-    }
-    $admin = \App\Models\User::where('type', 1)->first() ?? \App\Models\User::first();
-    auth()->login($admin);
-    $rendered = view('books.partials.table-row', ['book' => $b, 'rowNumber' => 1])->render();
-    $this->info("Successfully rendered table-row for booking #{$b->id}! Length: " . strlen($rendered));
-    $this->line("Sample snippet:");
-    if (preg_match('/<td class="books-col-team.*?<\/td>/s', $rendered, $matches)) {
-        $this->line(trim($matches[0]));
-    }
-});
-
