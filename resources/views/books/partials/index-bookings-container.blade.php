@@ -20,17 +20,12 @@
                         <table class="looker-table books-looker-table mb-0">
                             <thead>
                                 <tr>
-                                    <th scope="col">Row</th>
-                                    <th>ID</th>
-                                    <th>Client</th>
-                                    <th class="text-center">Team</th>
-                                    <th>Floor Plan</th>
-                                    <th>Date</th>
-                                    <th>Booths</th>
-                                    <th>Type</th>
-                                    <th>Status</th>
-                                    <th>Amount</th>
-                                    <th>Actions</th>
+                                    <th scope="col" style="width: 210px; min-width: 190px;">Booking ID</th>
+                                    <th scope="col" style="min-width: 260px;">Customer &amp; Location</th>
+                                    <th scope="col" style="width: 140px; min-width: 130px;">Date &amp; Time</th>
+                                    <th scope="col" style="width: 160px; min-width: 140px;">Booths</th>
+                                    <th scope="col" style="width: 130px; min-width: 120px;">Total Amount</th>
+                                    <th scope="col" style="width: 180px; min-width: 160px;">Payment &amp; Staff</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -63,17 +58,12 @@
                 <table class="looker-table books-looker-table mb-0" id="bookingsTable">
                     <thead>
                         <tr>
-                            <th scope="col">Row</th>
-                            <th>ID</th>
-                            <th>Client</th>
-                            <th class="text-center">Team</th>
-                            <th>Floor Plan</th>
-                            <th>Date</th>
-                            <th>Booths</th>
-                            <th>Type</th>
-                            <th>Status</th>
-                            <th>Amount</th>
-                            <th>Actions</th>
+                            <th scope="col" style="width: 210px; min-width: 190px;">Booking ID</th>
+                            <th scope="col" style="min-width: 260px;">Customer &amp; Location</th>
+                            <th scope="col" style="width: 140px; min-width: 130px;">Date &amp; Time</th>
+                            <th scope="col" style="width: 160px; min-width: 140px;">Booths</th>
+                            <th scope="col" style="width: 130px; min-width: 120px;">Total Amount</th>
+                            <th scope="col" style="width: 180px; min-width: 160px;">Payment &amp; Staff</th>
                         </tr>
                     </thead>
                     <tbody id="bookingsTableBody">
@@ -81,7 +71,7 @@
                             @include('books.partials.table-row', ['book' => $book, 'rowNumber' => $loop->iteration])
                         @empty
                             <tr>
-                                <td colspan="11" class="text-center py-5">
+                                <td colspan="6" class="text-center py-5">
                                     <div class="empty-state">
                                         <i class="fas fa-inbox empty-state-icon"></i>
                                         <h3>No bookings found</h3>

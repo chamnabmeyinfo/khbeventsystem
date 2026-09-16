@@ -79,121 +79,266 @@ body.books-table-resizing {
     cursor: col-resize !important;
     user-select: none;
 }
+.books-page .looker-table-wrapper {
+    overflow-x: auto;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0.25rem 0.15rem;
+}
+
+.books-page .books-looker-table {
+    border-collapse: separate !important;
+    border-spacing: 0 10px !important;
+    width: 100%;
+}
+
 .books-page .books-looker-table thead th {
     overflow: hidden;
     text-overflow: ellipsis;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 250, 252, 0.88) 100%) !important;
-    backdrop-filter: blur(16px) saturate(160%);
-    -webkit-backdrop-filter: blur(16px) saturate(160%);
-    border-top: none !important;
-    border-bottom: 2px solid rgba(0, 122, 255, 0.14) !important;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
-    font-size: 0.6875rem;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    font-size: 0.8rem;
     font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: var(--text-secondary) !important;
-    padding: 0.9rem 1rem !important;
+    letter-spacing: 0.02em;
+    color: #64748b !important;
+    padding: 0.5rem 1rem 0.65rem !important;
     white-space: nowrap;
 }
+
 .books-page .books-looker-table thead th:first-child,
 .books-page .books-looker-table thead th:last-child {
     border-radius: 0 !important;
+    border: none !important;
+}
+
+.books-page .books-looker-table tbody tr.books-table-row {
+    background: #ffffff !important;
+    border-radius: 14px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02) !important;
+    cursor: pointer;
+    transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.18s ease;
+}
+
+.books-page .books-looker-table tbody tr.books-table-row:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.07), 0 2px 6px rgba(0, 0, 0, 0.03) !important;
+}
+
+.books-page .books-looker-table tbody td {
+    background: #ffffff !important;
+    border-top: 1px solid rgba(226, 232, 240, 0.9) !important;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.9) !important;
     border-left: none !important;
     border-right: none !important;
-}
-.books-page .books-looker-table tbody tr.books-table-row {
-    cursor: pointer;
-    transition: background-color 0.15s ease, box-shadow 0.15s ease;
-}
-.books-page .books-looker-table tbody tr.books-table-row:nth-child(even) td {
-    background-color: rgba(255, 255, 255, 0.35);
-}
-.books-page .books-looker-table tbody tr.books-table-row:nth-child(odd) td {
-    background-color: rgba(255, 255, 255, 0.2);
-}
-.books-page .books-looker-table tbody tr.books-table-row:hover td {
-    background-color: rgba(0, 122, 255, 0.07) !important;
-    box-shadow: inset 3px 0 0 var(--accent-blue);
-}
-.books-page .books-looker-table tbody td {
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
     vertical-align: middle;
-    padding: 0.85rem 1rem !important;
+    padding: 1rem 1.25rem !important;
     font-size: 0.9rem;
 }
-.books-page .books-looker-table tbody tr:last-child td {
-    border-bottom: none !important;
+
+.books-page .books-looker-table tbody tr.books-table-row td:first-child {
+    border-top-left-radius: 14px !important;
+    border-bottom-left-radius: 14px !important;
+    border-left: 1px solid rgba(226, 232, 240, 0.9) !important;
 }
-.books-page .books-looker-table .books-col-rownum {
-    font-variant-numeric: tabular-nums;
-    font-weight: 600;
-    color: var(--text-tertiary);
-    width: 3rem;
-    text-align: center;
+
+.books-page .books-looker-table tbody tr.books-table-row td:last-child {
+    border-top-right-radius: 14px !important;
+    border-bottom-right-radius: 14px !important;
+    border-right: 1px solid rgba(226, 232, 240, 0.9) !important;
 }
-.books-page .books-looker-table .books-col-id {
-    font-variant-numeric: tabular-nums;
+
+/* 1. Booking ID & Type & Actions */
+.books-id-label {
+    font-size: 0.95rem;
     font-weight: 700;
-    color: var(--text-secondary);
-    width: 4.5rem;
+    color: #0f172a;
+    letter-spacing: -0.01em;
 }
-.books-page .books-looker-table .books-col-team {
-    text-align: center;
-    width: 6.5rem;
-    min-width: 5.5rem;
-}
-.books-team-cell {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    margin: 0 auto;
-    max-width: 100%;
-}
-.books-team-link {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-decoration: none !important;
-    color: inherit;
-    transition: transform 0.15s ease, opacity 0.15s ease;
-}
-.books-team-link:hover {
-    transform: translateY(-1px);
-    opacity: 0.9;
-}
-.books-team-link:hover .books-team-name {
-    color: var(--accent-blue, #0d6efd);
-}
-.books-team-avatar-wrap {
+
+.books-action-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    border: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 3px;
-}
-.books-team-name {
     font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--text-primary, #2d3748);
-    line-height: 1.2;
-    max-width: 90px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    display: block;
+    cursor: pointer;
+    transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
 }
-.books-page .books-looker-table .books-col-actions {
-    width: 1%;
-    white-space: nowrap;
+
+.books-action-btn:hover {
+    transform: scale(1.08);
 }
-.books-page .books-amount-cell {
-    color: var(--accent-green);
-    font-variant-numeric: tabular-nums;
+
+.books-action-btn--view {
+    background: #2563eb;
+    color: #ffffff;
+    box-shadow: 0 2px 5px rgba(37, 99, 235, 0.28);
+}
+
+.books-action-btn--delete {
+    background: #ef4444;
+    color: #ffffff;
+    box-shadow: 0 2px 5px rgba(239, 68, 68, 0.28);
+}
+
+.books-pill-type {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.22rem 0.65rem;
+    border-radius: 20px;
+    font-size: 0.6875rem;
     font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
+
+.books-pill-type--regular {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.books-pill-type--special {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.books-pill-type--temporary {
+    background: #f3e8ff;
+    color: #7e22ce;
+}
+
+/* 2. Customer */
+.books-client-avatar-wrap {
+    width: 42px;
+    height: 42px;
+}
+
+.books-client-avatar-img {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1.5px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.books-client-avatar-fallback {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.85rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.books-client-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.25;
+}
+
+.books-client-meta {
+    font-size: 0.78rem;
+    color: #64748b;
+    margin-top: 3px;
+    line-height: 1.25;
+}
+
+.books-meta-location {
+    color: #334155;
+    font-weight: 600;
+}
+
+/* 3. Date & Time */
+.books-date-main {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.25;
+}
+
+.books-date-sub {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+}
+
+/* 4. Booths */
+.books-booths-head {
+    font-size: 0.9rem;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    line-height: 1.25;
+}
+
+.books-booths-list {
+    font-size: 0.8rem;
+    color: #475569;
+    margin-top: 4px;
+    max-width: 170px;
+}
+
+/* 5. Total Amount */
+.books-amount-tag {
+    font-size: 1.15rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #d97706; /* Golden Amber from image_0 */
+    letter-spacing: -0.01em;
+}
+
+/* 6. Payment Status & Staff */
+.books-pill-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.22rem 0.65rem;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.books-pill-status--paid {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.books-pill-status--partial {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.books-pill-status--pending {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.books-staff-profile {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.books-staff-name {
+    max-width: 115px;
+    display: inline-block;
+    color: #334155;
+}
+
 .books-page .books-type-badge {
     display: inline-flex;
     align-items: center;

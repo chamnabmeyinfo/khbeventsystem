@@ -5,7 +5,7 @@
 
 @push('styles')
 <link rel="stylesheet" href="{{ asset('css/dashboard-looker.css') }}?v=3.6">
-<link rel="stylesheet" href="{{ asset('css/books-page-index.css') }}?v=1.1">
+<link rel="stylesheet" href="{{ asset('css/books-page-index.css') }}?v=1.2">
 <link rel="stylesheet" href="{{ asset('css/booths-on-books.css') }}?v=2.3">
 @endpush
 
