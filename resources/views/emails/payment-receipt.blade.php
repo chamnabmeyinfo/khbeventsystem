@@ -232,7 +232,17 @@
                 </div>
                 <div class="info-row">
                     <span class="label">Product Exchange Deduction:</span>
-                    <span class="value"><strong style="color: #17a2b8;">${{ number_format($productAmount ?? 0, 2) }}</strong></span>
+                    <span class="value">
+                        <strong style="color: #17a2b8;">${{ number_format($productAmount ?? 0, 2) }}</strong>
+                        @if(!empty($productQuantity))
+                            <span style="display: inline-block; background-color: #17a2b8; color: #ffffff; font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-left: 5px;">
+                                {{ number_format($productQuantity) }} units
+                                @if(!empty($productUnitPrice))
+                                    @ ${{ number_format($productUnitPrice, 2) }}/u
+                                @endif
+                            </span>
+                        @endif
+                    </span>
                 </div>
                 @if(!empty($productDetails))
                 <div class="info-row">
@@ -250,7 +260,17 @@
                 <h3 style="color: #17a2b8;">📦 Product Exchange Barter</h3>
                 <div class="info-row">
                     <span class="label">Goods Credited Value:</span>
-                    <span class="value"><strong style="color: #17a2b8;">${{ number_format($amount, 2) }}</strong></span>
+                    <span class="value">
+                        <strong style="color: #17a2b8;">${{ number_format($amount, 2) }}</strong>
+                        @if(!empty($productQuantity))
+                            <span style="display: inline-block; background-color: #17a2b8; color: #ffffff; font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-left: 5px;">
+                                {{ number_format($productQuantity) }} units
+                                @if(!empty($productUnitPrice))
+                                    @ ${{ number_format($productUnitPrice, 2) }}/u
+                                @endif
+                            </span>
+                        @endif
+                    </span>
                 </div>
                 @if(!empty($productDetails))
                 <div class="info-row">

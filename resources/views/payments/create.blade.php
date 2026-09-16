@@ -245,17 +245,58 @@
                         </div>
 
                         <!-- Right: Product Exchange Deduction -->
+                        <!-- Right: Product Exchange Deduction -->
                         <div class="col-md-6">
                             <h6 class="font-weight-bold text-indigo mb-3"><i class="fas fa-box-open mr-1"></i>2. Product Exchange Deduction</h6>
-                            <div class="form-group">
-                                <label for="product_amount" class="font-weight-bold">Product Value to Deduct ($) <span class="text-danger">*</span></label>
-                                <div class="input-group">
-                                    <div class="input-group-prepend"><span class="input-group-text">$</span></div>
-                                    <input type="number" name="product_amount" id="product_amount" class="form-control @error('product_amount') is-invalid @enderror" 
-                                           step="0.01" min="0.01" value="{{ old('product_amount') }}" placeholder="e.g. 50.00" oninput="calculateSplitTotal()">
-                                    <div class="input-group-append">
-                                        <button class="btn btn-outline-primary btn-sm" type="button" onclick="autoFillProductDifference()">Fill Remainder</button>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="product_quantity" class="font-weight-bold">Product Count / Qty</label>
+                                        <div class="input-group">
+                                            <input type="number" step="1" min="0" name="product_quantity" id="product_quantity" 
+                                                   class="form-control @error('product_quantity') is-invalid @enderror" 
+                                                   value="{{ old('product_quantity') }}" placeholder="e.g. 10" oninput="calculateProductSubtotal()">
+                                            <div class="input-group-append"><span class="input-group-text">units</span></div>
+                                        </div>
+                                        @error('product_quantity')
+                                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                                        @enderror
                                     </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="product_unit_price" class="font-weight-bold">Price per Unit ($)</label>
+                                        <div class="input-group">
+                                            <div class="input-group-prepend"><span class="input-group-text">$</span></div>
+                                            <input type="number" step="0.01" min="0" name="product_unit_price" id="product_unit_price" 
+                                                   class="form-control @error('product_unit_price') is-invalid @enderror" 
+                                                   value="{{ old('product_unit_price') }}" placeholder="e.g. 5.00" oninput="calculateProductSubtotal()">
+                                            <div class="input-group-append"><span class="input-group-text">/ unit</span></div>
+                                        </div>
+                                        @error('product_unit_price')
+                                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label for="product_amount" class="font-weight-bold mb-0">Total Product Value to Deduct ($) <span class="text-danger">*</span></label>
+                                    <div>
+                                        <button class="btn btn-outline-success btn-xs font-weight-bold mr-1" type="button" onclick="autoCalcCashFromBooth()" title="Auto-calculate cash needed to settle booth">
+                                            <i class="fas fa-coins mr-1"></i>Auto Cash
+                                        </button>
+                                        <button class="btn btn-outline-info btn-xs font-weight-bold" type="button" onclick="autoCalcCountFromBooth()" title="Auto-calculate count from unit price">
+                                            <i class="fas fa-calculator mr-1"></i>Auto Count
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="input-group">
+                                    <div class="input-group-prepend"><span class="input-group-text font-weight-bold text-info">$</span></div>
+                                    <input type="number" name="product_amount" id="product_amount" class="form-control font-weight-bold text-info @error('product_amount') is-invalid @enderror" 
+                                           step="0.01" min="0.01" value="{{ old('product_amount') }}" placeholder="e.g. 50.00" oninput="calculateSplitTotal()">
                                 </div>
                                 @error('product_amount')
                                     <div class="invalid-feedback d-block">{{ $message }}</div>
@@ -264,7 +305,7 @@
                             <div class="form-group">
                                 <label for="product_details" class="font-weight-bold">Product Items & Agreement Details <span class="text-danger">*</span></label>
                                 <textarea name="product_details" id="product_details" class="form-control @error('product_details') is-invalid @enderror" rows="2" 
-                                          placeholder="Describe items exchanged, quantities, or agreed barter terms (e.g. 50x Energy drink cases for VIP lounge)">{{ old('product_details') }}</textarea>
+                                          placeholder="Describe items exchanged, brands, batch numbers, or agreed barter terms (e.g. 10x promotional energy drink cases for VIP lounge)">{{ old('product_details') }}</textarea>
                                 @error('product_details')
                                     <div class="invalid-feedback d-block">{{ $message }}</div>
                                 @enderror
@@ -297,13 +338,34 @@
                         <strong>100% Product Exchange:</strong> The entire payment value is settled via product/goods barter without cash.
                     </div>
                     <div class="row">
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label for="product_quantity_only" class="font-weight-bold">Count / Qty</label>
+                                <div class="input-group">
+                                    <input type="number" id="product_quantity_only" class="form-control font-weight-bold" step="1" min="0" 
+                                           placeholder="e.g. 100" oninput="syncProductOnlyQty(this.value)">
+                                    <div class="input-group-append"><span class="input-group-text">units</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label for="product_unit_price_only" class="font-weight-bold">Unit Price ($)</label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend"><span class="input-group-text">$</span></div>
+                                    <input type="number" id="product_unit_price_only" class="form-control font-weight-bold" step="0.01" min="0" 
+                                           placeholder="e.g. 5.00" oninput="syncProductOnlyUnitPrice(this.value)">
+                                    <div class="input-group-append"><span class="input-group-text">/ unit</span></div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label for="product_amount_only" class="font-weight-bold">Total Product Barter Value ($) <span class="text-danger">*</span></label>
                                 <div class="input-group">
-                                    <div class="input-group-prepend"><span class="input-group-text">$</span></div>
-                                    <input type="number" id="product_amount_only" class="form-control" step="0.01" min="0.01" 
-                                           value="{{ old('product_structure') === 'product_exchange' ? old('product_amount') : '' }}" 
+                                    <div class="input-group-prepend"><span class="input-group-text font-weight-bold text-info">$</span></div>
+                                    <input type="number" id="product_amount_only" class="form-control font-weight-bold text-info" step="0.01" min="0.01" 
+                                           value="{{ old('payment_structure') === 'product_exchange' ? old('product_amount') : '' }}" 
                                            placeholder="e.g. 500.00" oninput="syncProductOnlyAmount(this.value)">
                                     <div class="input-group-append">
                                         <button class="btn btn-outline-secondary btn-sm" type="button" onclick="fillBalanceToProductOnly()">Full Balance</button>
@@ -311,11 +373,11 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-12">
                             <div class="form-group">
                                 <label for="product_details_only" class="font-weight-bold">Exchanged Products / Sponsorship Items <span class="text-danger">*</span></label>
                                 <textarea id="product_details_only" class="form-control" rows="2" 
-                                          placeholder="Specify products, quantities, delivery/agreement reference" oninput="syncProductOnlyDetails(this.value)">{{ old('product_structure') === 'product_exchange' ? old('product_details') : '' }}</textarea>
+                                          placeholder="Specify products, quantities, delivery/agreement reference" oninput="syncProductOnlyDetails(this.value)">{{ old('payment_structure') === 'product_exchange' ? old('product_details') : '' }}</textarea>
                             </div>
                         </div>
                     </div>
@@ -391,6 +453,86 @@ function onStructureChange(structure) {
         if (productVal) {
             syncProductOnlyAmount(productVal);
         }
+        const qtyVal = document.getElementById('product_quantity_only').value;
+        if (qtyVal) {
+            syncProductOnlyQty(qtyVal);
+        }
+        const upVal = document.getElementById('product_unit_price_only').value;
+        if (upVal) {
+            syncProductOnlyUnitPrice(upVal);
+        }
+    }
+}
+
+function calculateProductSubtotal() {
+    const qty = parseFloat(document.getElementById('product_quantity').value) || 0;
+    const unitPrice = parseFloat(document.getElementById('product_unit_price').value) || 0;
+    if (qty > 0 && unitPrice > 0) {
+        const subtotal = (qty * unitPrice).toFixed(2);
+        document.getElementById('product_amount').value = subtotal;
+    }
+    calculateSplitTotal();
+}
+
+function autoCalcCashFromBooth() {
+    const target = currentBookingBalance > 0 ? currentBookingBalance : currentBookingTotal;
+    const prodVal = parseFloat(document.getElementById('product_amount').value) || 0;
+    if (target > 0) {
+        const remainingCash = Math.max(0, target - prodVal);
+        document.getElementById('cash_amount').value = remainingCash.toFixed(2);
+        calculateSplitTotal();
+    }
+}
+
+function autoCalcCountFromBooth() {
+    const target = currentBookingBalance > 0 ? currentBookingBalance : currentBookingTotal;
+    const cash = parseFloat(document.getElementById('cash_amount').value) || 0;
+    const unitPrice = parseFloat(document.getElementById('product_unit_price').value) || 0;
+    const neededProductVal = Math.max(0, target - cash);
+    
+    if (unitPrice > 0) {
+        const count = Math.ceil(neededProductVal / unitPrice);
+        document.getElementById('product_quantity').value = count;
+        document.getElementById('product_amount').value = (count * unitPrice).toFixed(2);
+    } else {
+        document.getElementById('product_amount').value = neededProductVal.toFixed(2);
+    }
+    calculateSplitTotal();
+}
+
+function syncProductOnlyQty(val) {
+    let hiddenInput = document.getElementById('product_quantity_hidden');
+    if (!hiddenInput) {
+        hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'product_quantity';
+        hiddenInput.id = 'product_quantity_hidden';
+        document.getElementById('paymentForm').appendChild(hiddenInput);
+    }
+    hiddenInput.value = val;
+    calculateProductOnlySubtotal();
+}
+
+function syncProductOnlyUnitPrice(val) {
+    let hiddenInput = document.getElementById('product_unit_price_hidden');
+    if (!hiddenInput) {
+        hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'product_unit_price';
+        hiddenInput.id = 'product_unit_price_hidden';
+        document.getElementById('paymentForm').appendChild(hiddenInput);
+    }
+    hiddenInput.value = val;
+    calculateProductOnlySubtotal();
+}
+
+function calculateProductOnlySubtotal() {
+    const qty = parseFloat(document.getElementById('product_quantity_only').value) || 0;
+    const unitPrice = parseFloat(document.getElementById('product_unit_price_only').value) || 0;
+    if (qty > 0 && unitPrice > 0) {
+        const subtotal = (qty * unitPrice).toFixed(2);
+        document.getElementById('product_amount_only').value = subtotal;
+        syncProductOnlyAmount(subtotal);
     }
 }
 

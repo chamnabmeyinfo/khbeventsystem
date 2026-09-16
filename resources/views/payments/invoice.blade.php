@@ -93,8 +93,16 @@
                         <tr>
                             <td>
                                 <div><strong>Product Exchange Deduction</strong></div>
+                                @if($payment->product_quantity)
+                                <div class="small text-primary my-1">
+                                    <span class="badge bg-info text-white me-1">{{ number_format($payment->product_quantity) }} units</span>
+                                    @if($payment->product_unit_price)
+                                    <span>@ ${{ number_format($payment->product_unit_price, 2) }} / unit</span>
+                                    @endif
+                                </div>
+                                @endif
                                 @if($payment->product_details)
-                                <small class="text-muted">Exchange items: {{ $payment->product_details }}</small>
+                                <small class="text-muted d-block">Exchange items: {{ $payment->product_details }}</small>
                                 @endif
                             </td>
                             <td class="text-end">${{ number_format($payment->product_amount ?? 0, 2) }}</td>
@@ -107,8 +115,16 @@
                         <tr>
                             <td>
                                 <div><strong>Product Exchange Barter (100% Goods Deduction)</strong></div>
+                                @if($payment->product_quantity)
+                                <div class="small text-primary my-1">
+                                    <span class="badge bg-info text-white me-1">{{ number_format($payment->product_quantity) }} units</span>
+                                    @if($payment->product_unit_price)
+                                    <span>@ ${{ number_format($payment->product_unit_price, 2) }} / unit</span>
+                                    @endif
+                                </div>
+                                @endif
                                 @if($payment->product_details)
-                                <small class="text-muted">Exchange items: {{ $payment->product_details }}</small>
+                                <small class="text-muted d-block">Exchange items: {{ $payment->product_details }}</small>
                                 @endif
                             </td>
                             <td class="text-end">${{ number_format($payment->amount, 2) }}</td>

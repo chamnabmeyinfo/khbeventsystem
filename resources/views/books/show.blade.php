@@ -468,22 +468,43 @@
             </div>
         </div>
 
-        <div class="kpi-wrapper books-show-payment-kpis">
+        @php
+            $cashPaidTotal = method_exists($book, 'calculateCashPaidAmount') ? $book->calculateCashPaidAmount() : 0;
+            $productPaidTotal = method_exists($book, 'calculateProductPaidAmount') ? $book->calculateProductPaidAmount() : 0;
+            $productCountTotal = method_exists($book, 'calculateProductCount') ? $book->calculateProductCount() : 0;
+            $hasBarter = ($productPaidTotal > 0 || $productCountTotal > 0);
+        @endphp
+
+        <div class="kpi-wrapper books-show-payment-kpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
             <div class="kpi-card-looker">
                 <div class="kpi-top">
-                    <div class="kpi-title">Total</div>
+                    <div class="kpi-title">Booths Total</div>
                     <div class="kpi-icon-wrapper primary-icon"><i class="fas fa-file-invoice-dollar"></i></div>
                 </div>
                 <div class="kpi-value-looker books-amount-cell">${{ number_format($book->total_amount ?? 0, 2) }}</div>
-                <div class="kpi-bottom trend-neutral">Booking total</div>
+                <div class="kpi-bottom trend-neutral">Booth Booking Price</div>
             </div>
             <div class="kpi-card-looker success">
                 <div class="kpi-top">
-                    <div class="kpi-title">Paid</div>
-                    <div class="kpi-icon-wrapper success-icon"><i class="fas fa-check"></i></div>
+                    <div class="kpi-title">Real Money Paid</div>
+                    <div class="kpi-icon-wrapper success-icon"><i class="fas fa-coins"></i></div>
                 </div>
-                <div class="kpi-value-looker" style="color: var(--accent-blue);">${{ number_format($book->paid_amount ?? 0, 2) }}</div>
-                <div class="kpi-bottom trend-positive">Received</div>
+                <div class="kpi-value-looker" style="color: #10b981;">${{ number_format($cashPaidTotal, 2) }}</div>
+                <div class="kpi-bottom trend-positive">Cash / Bank Transfer</div>
+            </div>
+            <div class="kpi-card-looker" style="border-left: 4px solid #8b5cf6;">
+                <div class="kpi-top">
+                    <div class="kpi-title">Product Barter</div>
+                    <div class="kpi-icon-wrapper" style="background: rgba(139, 92, 246, 0.12); color: #8b5cf6;"><i class="fas fa-boxes"></i></div>
+                </div>
+                <div class="kpi-value-looker" style="color: #6f42c1;">${{ number_format($productPaidTotal, 2) }}</div>
+                <div class="kpi-bottom text-muted">
+                    @if($productCountTotal > 0)
+                        <span class="badge badge-pill badge-primary" style="background: #6f42c1; font-size: 0.75rem;">{{ (floor($productCountTotal) == $productCountTotal) ? (int)$productCountTotal : $productCountTotal }} products</span> counted
+                    @else
+                        Goods exchange
+                    @endif
+                </div>
             </div>
             <div class="kpi-card-looker {{ ($book->balance_amount ?? 0) > 0 ? 'warning' : 'success' }}">
                 <div class="kpi-top">
@@ -494,10 +515,33 @@
                     ${{ number_format($book->balance_amount ?? 0, 2) }}
                 </div>
                 <div class="kpi-bottom {{ ($book->balance_amount ?? 0) > 0 ? 'trend-warning' : 'trend-positive' }}">
-                    {{ ($book->balance_amount ?? 0) > 0 ? 'Outstanding' : 'Settled' }}
+                    {{ ($book->balance_amount ?? 0) > 0 ? 'Outstanding to Pay' : '100% Settled' }}
                 </div>
             </div>
         </div>
+
+        @if($hasBarter)
+        <div class="alert alert-light border mb-4 mt-2 d-flex flex-wrap align-items-center justify-content-between p-3" style="background: #fdfcfe; border-left: 4px solid #6f42c1 !important; border-radius: 8px;">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-balance-scale text-primary fa-lg mr-3"></i>
+                <div>
+                    <span class="font-weight-bold text-dark">Booths Booking Settlement Breakdown:</span>
+                    <div class="small text-muted mt-1">
+                        Booth Price: <strong class="text-dark">${{ number_format($book->total_amount ?? 0, 2) }}</strong> = 
+                        Cash Paid: <strong class="text-success">${{ number_format($cashPaidTotal, 2) }}</strong> + 
+                        Product Barter: <strong class="text-primary" style="color: #6f42c1 !important;">${{ number_format($productPaidTotal, 2) }}</strong> 
+                        @if($productCountTotal > 0)
+                            <span class="badge badge-light border text-dark">({{ (floor($productCountTotal) == $productCountTotal) ? (int)$productCountTotal : $productCountTotal }} items counted)</span>
+                        @endif
+                        &nbsp;|&nbsp; Balance Remaining: <strong class="{{ ($book->balance_amount ?? 0) > 0 ? 'text-danger' : 'text-success' }}">${{ number_format($book->balance_amount ?? 0, 2) }}</strong>
+                    </div>
+                </div>
+            </div>
+            <span class="badge {{ ($book->balance_amount ?? 0) <= 0 ? 'badge-success' : 'badge-warning' }} px-3 py-2 text-uppercase font-weight-bold">
+                {{ ($book->balance_amount ?? 0) <= 0 ? 'Fully Settled' : 'Partially Paid' }}
+            </span>
+        </div>
+        @endif
 
         @if($payments && $payments->count() > 0)
         <h3 class="h6 fw-bold text-secondary mb-3"><i class="fas fa-history me-2"></i>Payment history</h3>
@@ -529,13 +573,27 @@
                                     <i class="fas fa-layer-group mr-1"></i> Split Payment
                                 </span>
                                 <div class="small text-muted mt-1" style="font-size: 0.75rem;">
-                                    <span class="text-success">${{ number_format($payment->cash_amount ?? 0, 2) }}</span> + 
-                                    <span class="text-info">${{ number_format($payment->product_amount ?? 0, 2) }} prod</span>
+                                    <span class="text-success font-weight-bold">${{ number_format($payment->cash_amount ?? 0, 2) }}</span> + 
+                                    <span class="text-info font-weight-bold">${{ number_format($payment->product_amount ?? 0, 2) }} prod</span>
+                                    @if($payment->product_quantity)
+                                        <div class="mt-1">
+                                            <span class="badge badge-light border text-dark" title="Count and unit price">
+                                                <i class="fas fa-boxes text-info mr-1"></i>{{ $payment->product_quantity_formatted }} items{{ $payment->product_unit_price > 0 ? ' @ $' . number_format($payment->product_unit_price, 2) : '' }}
+                                            </span>
+                                        </div>
+                                    @endif
                                 </div>
                             @elseif($isProdExchange)
                                 <span class="status-badge status-badge-indigo" title="Product exchange barter">
                                     <i class="fas fa-boxes mr-1"></i> Product Exchange
                                 </span>
+                                @if($payment->product_quantity)
+                                <div class="small text-muted mt-1" style="font-size: 0.75rem;">
+                                    <span class="badge badge-light border text-dark" title="Count and unit price">
+                                        <i class="fas fa-boxes text-info mr-1"></i>{{ $payment->product_quantity_formatted }} items{{ $payment->product_unit_price > 0 ? ' @ $' . number_format($payment->product_unit_price, 2) : '' }}
+                                    </span>
+                                </div>
+                                @endif
                             @else
                                 <span class="status-badge status-badge-blue">{{ ucfirst(str_replace('_', ' ', $payment->payment_method)) }}</span>
                             @endif
@@ -703,7 +761,7 @@
                         <div class="col-md-6" id="modalRecWrapperProduct" style="display: none;">
                             <div class="form-group mb-3">
                                 <label for="modal_rec_product_amount" class="font-weight-bold text-info">
-                                    <i class="fas fa-box-open mr-1"></i>Product Exchange Deduction ($) <span class="text-danger">*</span>
+                                    <i class="fas fa-box-open mr-1"></i>Total Product Barter Value ($) <span class="text-danger">*</span>
                                 </label>
                                 <div class="input-group">
                                     <div class="input-group-prepend"><span class="input-group-text text-info font-weight-bold">$</span></div>
@@ -723,6 +781,41 @@
                                 </select>
                             </div>
                         </div>
+
+                        <!-- Product Count & Valuation Row -->
+                        <div class="col-md-12" id="modalRecWrapperProductCount" style="display: none;">
+                            <div class="p-3 mb-3 rounded" style="background: #f8fafc; border: 1px solid #cbd5e1;">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="font-weight-bold text-info small text-uppercase">
+                                        <i class="fas fa-boxes mr-1"></i>Count Goods & Auto-Calculate Barter
+                                    </span>
+                                    <small class="text-muted font-weight-bold">Quantity &times; Unit Price = Total Barter Value</small>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-2">
+                                            <label for="modal_rec_product_quantity" class="font-weight-bold small text-muted">Product Count / Quantity</label>
+                                            <div class="input-group">
+                                                <input type="number" step="1" min="0" name="product_quantity" id="modal_rec_product_quantity" 
+                                                       class="form-control font-weight-bold" placeholder="e.g. 10" oninput="updateQuickRecProductSubtotal()">
+                                                <div class="input-group-append"><span class="input-group-text">units</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-2">
+                                            <label for="modal_rec_product_unit_price" class="font-weight-bold small text-muted">Price per Unit ($)</label>
+                                            <div class="input-group">
+                                                <div class="input-group-prepend"><span class="input-group-text">$</span></div>
+                                                <input type="number" step="0.01" min="0" name="product_unit_price" id="modal_rec_product_unit_price" 
+                                                       class="form-control font-weight-bold" placeholder="e.g. 5.00" oninput="updateQuickRecProductSubtotal()">
+                                                <div class="input-group-append"><span class="input-group-text">/ unit</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Product Terms -->
@@ -731,16 +824,39 @@
                             <i class="fas fa-clipboard-list mr-1"></i>Product Barter Items & Description
                         </label>
                         <textarea name="product_details" id="modal_rec_product_details" rows="2" 
-                                  class="form-control" placeholder="Describe goods received for barter deduction..."></textarea>
+                                  class="form-control" placeholder="Describe goods received for barter deduction (e.g. 10 cases of beverages, brand display LED, shirts)..."></textarea>
                     </div>
 
-                    <!-- Calculation Box -->
-                    <div class="calc-modal-box mb-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="text-muted font-weight-bold">Total Credited Value:</span>
+                    <!-- Calculation to Booths Booking Price Box -->
+                    <div class="calc-modal-box mb-3" style="background: #f0f7ff; border: 1px solid #b8daff; border-radius: 8px; padding: 14px 16px;">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted font-weight-bold small text-uppercase">Booths Booking Total Price:</span>
+                            <strong class="text-dark font-weight-bold" style="font-size: 1.05rem;">${{ number_format($book->total_amount ?? 0, 2) }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted font-weight-bold small text-uppercase">Current Outstanding Balance:</span>
+                            <strong class="text-warning" id="modalRecOutstandingText">${{ number_format($book->balance_amount > 0 ? $book->balance_amount : ($book->total_amount ?? 0), 2) }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                            <span class="text-muted font-weight-bold small text-uppercase">Total Payment Credited:</span>
                             <span class="font-weight-bold text-primary" id="modalRecTotalCredited" style="font-size: 1.25rem;">
                                 ${{ number_format($book->balance_amount > 0 ? $book->balance_amount : ($book->total_amount ?? 0), 2) }}
                             </span>
+                        </div>
+                        <div class="pt-2 mt-2 border-top" id="modalRecBoothCalcFeedbackContainer" style="display: none;">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap">
+                                <small class="text-dark font-weight-bold" id="modalRecBoothCalcFeedback">
+                                    Deducts against booth booking price.
+                                </small>
+                                <div class="mt-1 mt-md-0">
+                                    <button type="button" class="btn btn-xs btn-outline-success font-weight-bold mr-1" onclick="autoCalcRecCashFromBooth()" title="Auto-fill cash needed to match booth price">
+                                        <i class="fas fa-coins mr-1"></i>Auto Cash
+                                    </button>
+                                    <button type="button" class="btn btn-xs btn-outline-info font-weight-bold" onclick="autoCalcRecCountFromBooth()" title="Auto-fill product count needed from unit price">
+                                        <i class="fas fa-calculator mr-1"></i>Auto Count
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -862,12 +978,12 @@
                         <div class="col-md-6" id="modalEditWrapperProduct" style="display: none;">
                             <div class="form-group mb-3">
                                 <label for="modal_edit_product_amount" class="font-weight-bold text-info">
-                                    <i class="fas fa-box-open mr-1"></i>Product Exchange Deduction ($) <span class="text-danger">*</span>
+                                    <i class="fas fa-box-open mr-1"></i>Total Product Barter Value ($) <span class="text-danger">*</span>
                                 </label>
                                 <div class="input-group">
                                     <div class="input-group-prepend"><span class="input-group-text text-info font-weight-bold">$</span></div>
                                     <input type="number" step="0.01" min="0" name="product_amount" id="modal_edit_product_amount" 
-                                           class="form-control form-control-lg font-weight-bold" oninput="updateEditCalc()">
+                                           class="form-control form-control-lg font-weight-bold" placeholder="0.00" oninput="updateEditCalc()">
                                 </div>
                             </div>
                         </div>
@@ -882,6 +998,41 @@
                                 </select>
                             </div>
                         </div>
+
+                        <!-- Product Count & Valuation Row -->
+                        <div class="col-md-12" id="modalEditWrapperProductCount" style="display: none;">
+                            <div class="p-3 mb-3 rounded" style="background: #f8fafc; border: 1px solid #cbd5e1;">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="font-weight-bold text-info small text-uppercase">
+                                        <i class="fas fa-boxes mr-1"></i>Count Goods & Auto-Calculate Barter
+                                    </span>
+                                    <small class="text-muted font-weight-bold">Quantity &times; Unit Price = Total Barter Value</small>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-2">
+                                            <label for="modal_edit_product_quantity" class="font-weight-bold small text-muted">Product Count / Quantity</label>
+                                            <div class="input-group">
+                                                <input type="number" step="1" min="0" name="product_quantity" id="modal_edit_product_quantity" 
+                                                       class="form-control font-weight-bold" placeholder="e.g. 10" oninput="updateEditProductSubtotal()">
+                                                <div class="input-group-append"><span class="input-group-text">units</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-2">
+                                            <label for="modal_edit_product_unit_price" class="font-weight-bold small text-muted">Price per Unit ($)</label>
+                                            <div class="input-group">
+                                                <div class="input-group-prepend"><span class="input-group-text">$</span></div>
+                                                <input type="number" step="0.01" min="0" name="product_unit_price" id="modal_edit_product_unit_price" 
+                                                       class="form-control font-weight-bold" placeholder="e.g. 5.00" oninput="updateEditProductSubtotal()">
+                                                <div class="input-group-append"><span class="input-group-text">/ unit</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Product Terms -->
@@ -890,14 +1041,37 @@
                             <i class="fas fa-clipboard-list mr-1"></i>Product Barter Items & Description
                         </label>
                         <textarea name="product_details" id="modal_edit_product_details" rows="2" 
-                                  class="form-control" placeholder="Describe goods received for barter deduction..."></textarea>
+                                  class="form-control" placeholder="Describe goods received for barter deduction (e.g. 10 cases of beverages, brand display LED, shirts)..."></textarea>
                     </div>
 
-                    <!-- Calculation Box -->
-                    <div class="calc-modal-box mb-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="text-muted font-weight-bold">Total Credited Value:</span>
+                    <!-- Calculation to Booths Booking Price Box -->
+                    <div class="calc-modal-box mb-3" style="background: #f0f7ff; border: 1px solid #b8daff; border-radius: 8px; padding: 14px 16px;">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted font-weight-bold small text-uppercase">Booths Booking Total Price:</span>
+                            <strong class="text-dark font-weight-bold" style="font-size: 1.05rem;">${{ number_format($book->total_amount ?? 0, 2) }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted font-weight-bold small text-uppercase">Current Outstanding Balance:</span>
+                            <strong class="text-warning">${{ number_format($book->balance_amount > 0 ? $book->balance_amount : ($book->total_amount ?? 0), 2) }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                            <span class="text-muted font-weight-bold small text-uppercase">Total Payment Credited:</span>
                             <span class="font-weight-bold text-primary" id="modalEditTotalCredited" style="font-size: 1.25rem;">$0.00</span>
+                        </div>
+                        <div class="pt-2 mt-2 border-top" id="modalEditBoothCalcFeedbackContainer" style="display: none;">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap">
+                                <small class="text-dark font-weight-bold" id="modalEditBoothCalcFeedback">
+                                    Deducts against booth booking price.
+                                </small>
+                                <div class="mt-1 mt-md-0">
+                                    <button type="button" class="btn btn-xs btn-outline-success font-weight-bold mr-1" onclick="autoCalcEditCashFromBooth()" title="Auto-fill cash needed to match booth price">
+                                        <i class="fas fa-coins mr-1"></i>Auto Cash
+                                    </button>
+                                    <button type="button" class="btn btn-xs btn-outline-info font-weight-bold" onclick="autoCalcEditCountFromBooth()" title="Auto-fill product count needed from unit price">
+                                        <i class="fas fa-calculator mr-1"></i>Auto Count
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -986,6 +1160,10 @@
                             <div class="col-6 text-info"><i class="fas fa-boxes mr-1"></i>Product Deduction:</div>
                             <div class="col-6 text-right font-weight-bold text-info" id="viewModalProductPortion">$0.00</div>
                         </div>
+                    </div>
+                    <div id="viewModalProductQuantityRow" class="row mb-2 pl-3" style="display: none;">
+                        <div class="col-6 text-info"><i class="fas fa-calculator mr-1"></i>Count & Unit Price:</div>
+                        <div class="col-6 text-right font-weight-bold text-info" id="viewModalProductQuantityVal">-</div>
                     </div>
                     <div id="viewModalProductTermsRow" class="mb-2" style="display: none;">
                         <div class="text-muted small mb-1"><i class="fas fa-info-circle mr-1"></i>Exchanged Items / Terms:</div>
@@ -1186,6 +1364,7 @@ function setQuickRecordStructure(structure) {
     const wrapperStandard = document.getElementById('modalRecWrapperStandard');
     const wrapperCash = document.getElementById('modalRecWrapperCash');
     const wrapperProduct = document.getElementById('modalRecWrapperProduct');
+    const wrapperProductCount = document.getElementById('modalRecWrapperProductCount');
     const wrapperMethod = document.getElementById('modalRecWrapperMethod');
     const wrapperDetails = document.getElementById('modalRecWrapperProductDetails');
     const lblMethod = document.getElementById('modalRecLblMethod');
@@ -1194,6 +1373,7 @@ function setQuickRecordStructure(structure) {
         if (wrapperStandard) wrapperStandard.style.display = '';
         if (wrapperCash) wrapperCash.style.display = 'none';
         if (wrapperProduct) wrapperProduct.style.display = 'none';
+        if (wrapperProductCount) wrapperProductCount.style.display = 'none';
         if (wrapperMethod) wrapperMethod.style.display = '';
         if (wrapperDetails) wrapperDetails.style.display = 'none';
         if (lblMethod) lblMethod.textContent = 'Payment Method';
@@ -1201,6 +1381,7 @@ function setQuickRecordStructure(structure) {
         if (wrapperStandard) wrapperStandard.style.display = 'none';
         if (wrapperCash) wrapperCash.style.display = '';
         if (wrapperProduct) wrapperProduct.style.display = '';
+        if (wrapperProductCount) wrapperProductCount.style.display = '';
         if (wrapperMethod) wrapperMethod.style.display = '';
         if (wrapperDetails) wrapperDetails.style.display = '';
         if (lblMethod) lblMethod.textContent = 'Cash/Transfer Method';
@@ -1208,11 +1389,54 @@ function setQuickRecordStructure(structure) {
         if (wrapperStandard) wrapperStandard.style.display = 'none';
         if (wrapperCash) wrapperCash.style.display = 'none';
         if (wrapperProduct) wrapperProduct.style.display = '';
+        if (wrapperProductCount) wrapperProductCount.style.display = '';
         if (wrapperMethod) wrapperMethod.style.display = 'none';
         if (wrapperDetails) wrapperDetails.style.display = '';
     }
 
     updateQuickRecCalc();
+}
+
+function updateQuickRecProductSubtotal() {
+    const qty = parseFloat(document.getElementById('modal_rec_product_quantity')?.value) || 0;
+    const unitPrice = parseFloat(document.getElementById('modal_rec_product_unit_price')?.value) || 0;
+    const prodAmtInput = document.getElementById('modal_rec_product_amount');
+
+    if (qty > 0 && unitPrice > 0) {
+        const subtotal = Math.round(qty * unitPrice * 100) / 100;
+        if (prodAmtInput) prodAmtInput.value = subtotal.toFixed(2);
+    }
+
+    updateQuickRecCalc();
+}
+
+function autoCalcRecCashFromBooth() {
+    const boothPrice = {{ (float) ($book->total_amount ?? 0) }};
+    const prodAmt = parseFloat(document.getElementById('modal_rec_product_amount')?.value) || 0;
+    const neededCash = Math.max(0, boothPrice - prodAmt);
+    const cashInput = document.getElementById('modal_rec_cash_amount');
+    if (cashInput) {
+        cashInput.value = neededCash.toFixed(2);
+    }
+    updateQuickRecCalc();
+}
+
+function autoCalcRecCountFromBooth() {
+    const boothPrice = {{ (float) ($book->total_amount ?? 0) }};
+    const cashAmt = parseFloat(document.getElementById('modal_rec_cash_amount')?.value) || 0;
+    const unitPrice = parseFloat(document.getElementById('modal_rec_product_unit_price')?.value) || 0;
+    const neededVal = Math.max(0, boothPrice - cashAmt);
+
+    if (unitPrice > 0) {
+        const neededQty = Math.ceil(neededVal / unitPrice);
+        const qtyInput = document.getElementById('modal_rec_product_quantity');
+        if (qtyInput) qtyInput.value = neededQty;
+        updateQuickRecProductSubtotal();
+    } else {
+        const prodAmtInput = document.getElementById('modal_rec_product_amount');
+        if (prodAmtInput) prodAmtInput.value = neededVal.toFixed(2);
+        updateQuickRecCalc();
+    }
 }
 
 function updateQuickRecCalc() {
@@ -1221,18 +1445,39 @@ function updateQuickRecCalc() {
     const isProduct = document.getElementById('modal_rec_product')?.checked;
 
     let total = 0;
+    let cash = 0;
+    let product = 0;
+
     if (isStandard) {
         total = parseFloat(document.getElementById('modal_rec_amount')?.value) || 0;
     } else if (isSplit) {
-        const cash = parseFloat(document.getElementById('modal_rec_cash_amount')?.value) || 0;
-        const product = parseFloat(document.getElementById('modal_rec_product_amount')?.value) || 0;
+        cash = parseFloat(document.getElementById('modal_rec_cash_amount')?.value) || 0;
+        product = parseFloat(document.getElementById('modal_rec_product_amount')?.value) || 0;
         total = cash + product;
     } else if (isProduct) {
-        total = parseFloat(document.getElementById('modal_rec_product_amount')?.value) || 0;
+        product = parseFloat(document.getElementById('modal_rec_product_amount')?.value) || 0;
+        total = product;
     }
 
     const badge = document.getElementById('modalRecTotalCredited');
     if (badge) badge.textContent = '$' + total.toFixed(2);
+
+    const boothPrice = {{ (float) ($book->total_amount ?? 0) }};
+    const feedbackBox = document.getElementById('modalRecBoothCalcFeedbackContainer');
+    const feedbackText = document.getElementById('modalRecBoothCalcFeedback');
+
+    if (feedbackBox && feedbackText) {
+        if (isSplit) {
+            feedbackBox.style.display = '';
+            const remainingCashNeeded = Math.max(0, boothPrice - product);
+            feedbackText.innerHTML = `Booth Price: <strong>$${boothPrice.toFixed(2)}</strong> | Barter: <strong>$${product.toFixed(2)}</strong> &rarr; Cash required to settle: <strong>$${remainingCashNeeded.toFixed(2)}</strong>`;
+        } else if (isProduct) {
+            feedbackBox.style.display = '';
+            feedbackText.innerHTML = `Booth Price: <strong>$${boothPrice.toFixed(2)}</strong> | Barter Total: <strong>$${product.toFixed(2)}</strong> ${product >= boothPrice ? '<span class="text-success font-weight-bold">(100% covers booth!)</span>' : '<span class="text-muted">(Short by $' + (boothPrice - product).toFixed(2) + ')</span>'}`;
+        } else {
+            feedbackBox.style.display = 'none';
+        }
+    }
 }
 
 function quickFillRecBalance() {
@@ -1264,6 +1509,7 @@ function setEditStructure(structure) {
     const wrapperStandard = document.getElementById('modalEditWrapperStandard');
     const wrapperCash = document.getElementById('modalEditWrapperCash');
     const wrapperProduct = document.getElementById('modalEditWrapperProduct');
+    const wrapperProductCount = document.getElementById('modalEditWrapperProductCount');
     const wrapperMethod = document.getElementById('modalEditWrapperMethod');
     const wrapperDetails = document.getElementById('modalEditWrapperProductDetails');
     const lblMethod = document.getElementById('modalEditLblMethod');
@@ -1272,6 +1518,7 @@ function setEditStructure(structure) {
         if (wrapperStandard) wrapperStandard.style.display = '';
         if (wrapperCash) wrapperCash.style.display = 'none';
         if (wrapperProduct) wrapperProduct.style.display = 'none';
+        if (wrapperProductCount) wrapperProductCount.style.display = 'none';
         if (wrapperMethod) wrapperMethod.style.display = '';
         if (wrapperDetails) wrapperDetails.style.display = 'none';
         if (lblMethod) lblMethod.textContent = 'Payment Method';
@@ -1279,6 +1526,7 @@ function setEditStructure(structure) {
         if (wrapperStandard) wrapperStandard.style.display = 'none';
         if (wrapperCash) wrapperCash.style.display = '';
         if (wrapperProduct) wrapperProduct.style.display = '';
+        if (wrapperProductCount) wrapperProductCount.style.display = '';
         if (wrapperMethod) wrapperMethod.style.display = '';
         if (wrapperDetails) wrapperDetails.style.display = '';
         if (lblMethod) lblMethod.textContent = 'Cash/Transfer Method';
@@ -1286,11 +1534,54 @@ function setEditStructure(structure) {
         if (wrapperStandard) wrapperStandard.style.display = 'none';
         if (wrapperCash) wrapperCash.style.display = 'none';
         if (wrapperProduct) wrapperProduct.style.display = '';
+        if (wrapperProductCount) wrapperProductCount.style.display = '';
         if (wrapperMethod) wrapperMethod.style.display = 'none';
         if (wrapperDetails) wrapperDetails.style.display = '';
     }
 
     updateEditCalc();
+}
+
+function updateEditProductSubtotal() {
+    const qty = parseFloat(document.getElementById('modal_edit_product_quantity')?.value) || 0;
+    const unitPrice = parseFloat(document.getElementById('modal_edit_product_unit_price')?.value) || 0;
+    const prodAmtInput = document.getElementById('modal_edit_product_amount');
+
+    if (qty > 0 && unitPrice > 0) {
+        const subtotal = Math.round(qty * unitPrice * 100) / 100;
+        if (prodAmtInput) prodAmtInput.value = subtotal.toFixed(2);
+    }
+
+    updateEditCalc();
+}
+
+function autoCalcEditCashFromBooth() {
+    const boothPrice = {{ (float) ($book->total_amount ?? 0) }};
+    const prodAmt = parseFloat(document.getElementById('modal_edit_product_amount')?.value) || 0;
+    const neededCash = Math.max(0, boothPrice - prodAmt);
+    const cashInput = document.getElementById('modal_edit_cash_amount');
+    if (cashInput) {
+        cashInput.value = neededCash.toFixed(2);
+    }
+    updateEditCalc();
+}
+
+function autoCalcEditCountFromBooth() {
+    const boothPrice = {{ (float) ($book->total_amount ?? 0) }};
+    const cashAmt = parseFloat(document.getElementById('modal_edit_cash_amount')?.value) || 0;
+    const unitPrice = parseFloat(document.getElementById('modal_edit_product_unit_price')?.value) || 0;
+    const neededVal = Math.max(0, boothPrice - cashAmt);
+
+    if (unitPrice > 0) {
+        const neededQty = Math.ceil(neededVal / unitPrice);
+        const qtyInput = document.getElementById('modal_edit_product_quantity');
+        if (qtyInput) qtyInput.value = neededQty;
+        updateEditProductSubtotal();
+    } else {
+        const prodAmtInput = document.getElementById('modal_edit_product_amount');
+        if (prodAmtInput) prodAmtInput.value = neededVal.toFixed(2);
+        updateEditCalc();
+    }
 }
 
 function updateEditCalc() {
@@ -1299,18 +1590,39 @@ function updateEditCalc() {
     const isProduct = document.getElementById('modal_edit_product')?.checked;
 
     let total = 0;
+    let cash = 0;
+    let product = 0;
+
     if (isStandard) {
         total = parseFloat(document.getElementById('modal_edit_amount')?.value) || 0;
     } else if (isSplit) {
-        const cash = parseFloat(document.getElementById('modal_edit_cash_amount')?.value) || 0;
-        const product = parseFloat(document.getElementById('modal_edit_product_amount')?.value) || 0;
+        cash = parseFloat(document.getElementById('modal_edit_cash_amount')?.value) || 0;
+        product = parseFloat(document.getElementById('modal_edit_product_amount')?.value) || 0;
         total = cash + product;
     } else if (isProduct) {
-        total = parseFloat(document.getElementById('modal_edit_product_amount')?.value) || 0;
+        product = parseFloat(document.getElementById('modal_edit_product_amount')?.value) || 0;
+        total = product;
     }
 
     const badge = document.getElementById('modalEditTotalCredited');
     if (badge) badge.textContent = '$' + total.toFixed(2);
+
+    const boothPrice = {{ (float) ($book->total_amount ?? 0) }};
+    const feedbackBox = document.getElementById('modalEditBoothCalcFeedbackContainer');
+    const feedbackText = document.getElementById('modalEditBoothCalcFeedback');
+
+    if (feedbackBox && feedbackText) {
+        if (isSplit) {
+            feedbackBox.style.display = '';
+            const remainingCashNeeded = Math.max(0, boothPrice - product);
+            feedbackText.innerHTML = `Booth Price: <strong>$${boothPrice.toFixed(2)}</strong> | Barter: <strong>$${product.toFixed(2)}</strong> &rarr; Cash required to settle: <strong>$${remainingCashNeeded.toFixed(2)}</strong>`;
+        } else if (isProduct) {
+            feedbackBox.style.display = '';
+            feedbackText.innerHTML = `Booth Price: <strong>$${boothPrice.toFixed(2)}</strong> | Barter Total: <strong>$${product.toFixed(2)}</strong> ${product >= boothPrice ? '<span class="text-success font-weight-bold">(100% covers booth!)</span>' : '<span class="text-muted">(Short by $' + (boothPrice - product).toFixed(2) + ')</span>'}`;
+        } else {
+            feedbackBox.style.display = 'none';
+        }
+    }
 }
 
 function openEditPaymentModal(payment) {
@@ -1331,6 +1643,16 @@ function openEditPaymentModal(payment) {
     document.getElementById('modal_edit_amount').value = parseFloat(payment.amount || 0).toFixed(2);
     document.getElementById('modal_edit_cash_amount').value = parseFloat(payment.cash_amount || payment.amount || 0).toFixed(2);
     document.getElementById('modal_edit_product_amount').value = parseFloat(payment.product_amount || (isProduct ? payment.amount : 0)).toFixed(2);
+    
+    const qtyInput = document.getElementById('modal_edit_product_quantity');
+    if (qtyInput) {
+        qtyInput.value = payment.product_quantity ? (parseFloat(payment.product_quantity) || '') : '';
+    }
+    const unitPriceInput = document.getElementById('modal_edit_product_unit_price');
+    if (unitPriceInput) {
+        unitPriceInput.value = payment.product_unit_price ? parseFloat(payment.product_unit_price).toFixed(2) : '';
+    }
+
     document.getElementById('modal_edit_product_details').value = payment.product_details || '';
 
     const methodSelect = document.getElementById('modal_edit_method');
@@ -1394,6 +1716,20 @@ function viewPaymentDetails(payment, username) {
         document.getElementById('viewModalProductPortion').textContent = '$' + parseFloat(payment.product_amount || 0).toFixed(2);
     } else {
         splitBox.style.display = 'none';
+    }
+
+    const qtyRow = document.getElementById('viewModalProductQuantityRow');
+    const qtyVal = document.getElementById('viewModalProductQuantityVal');
+    const qty = parseFloat(payment.product_quantity || 0);
+    const unitPrice = parseFloat(payment.product_unit_price || 0);
+    if ((isSplit || isProduct) && qty > 0) {
+        if (qtyRow && qtyVal) {
+            qtyRow.style.display = '';
+            const qtyClean = (Math.floor(qty) === qty) ? qty : qty.toFixed(2);
+            qtyVal.textContent = `${qtyClean} items` + (unitPrice > 0 ? ` @ $${unitPrice.toFixed(2)}/unit` : '');
+        }
+    } else if (qtyRow) {
+        qtyRow.style.display = 'none';
     }
 
     const termsRow = document.getElementById('viewModalProductTermsRow');

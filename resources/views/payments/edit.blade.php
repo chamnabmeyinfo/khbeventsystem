@@ -199,17 +199,68 @@
                         </div>
                     </div>
 
+                    <!-- Product Quantity and Unit Price -->
+                    <div class="col-md-6" id="wrapperProductCount" style="{{ in_array($currentStructure, ['split', 'product_exchange']) ? '' : 'display: none;' }}">
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="form-group">
+                                    <label for="product_quantity" class="font-weight-bold text-info">
+                                        <i class="fas fa-cubes mr-1"></i>Product Count / Qty
+                                    </label>
+                                    <div class="input-group">
+                                        <input type="number" step="1" min="0" name="product_quantity" id="product_quantity" 
+                                               class="form-control form-control-lg @error('product_quantity') is-invalid @enderror" 
+                                               placeholder="e.g. 10" value="{{ old('product_quantity', $payment->product_quantity) }}" oninput="calculateEditProductSubtotal()">
+                                        <div class="input-group-append"><span class="input-group-text">units</span></div>
+                                    </div>
+                                    @error('product_quantity')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="form-group">
+                                    <label for="product_unit_price" class="font-weight-bold text-info">
+                                        <i class="fas fa-tag mr-1"></i>Price per Unit ($)
+                                    </label>
+                                    <div class="input-group">
+                                        <div class="input-group-prepend"><span class="input-group-text">$</span></div>
+                                        <input type="number" step="0.01" min="0" name="product_unit_price" id="product_unit_price" 
+                                               class="form-control form-control-lg @error('product_unit_price') is-invalid @enderror" 
+                                               placeholder="e.g. 5.00" value="{{ old('product_unit_price', $payment->product_unit_price) }}" oninput="calculateEditProductSubtotal()">
+                                        <div class="input-group-append"><span class="input-group-text">/u</span></div>
+                                    </div>
+                                    @error('product_unit_price')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="col-md-6" id="wrapperProductAmount" style="{{ in_array($currentStructure, ['split', 'product_exchange']) ? '' : 'display: none;' }}">
                         <div class="form-group">
-                            <label for="product_amount" class="font-weight-bold text-info">
-                                <i class="fas fa-box-open mr-1"></i>Product Exchange Deduction ($) <span class="text-danger">*</span>
-                            </label>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label for="product_amount" class="font-weight-bold text-info mb-0">
+                                    <i class="fas fa-box-open mr-1"></i>Product Exchange Deduction ($) <span class="text-danger">*</span>
+                                </label>
+                                @if($payment->booking)
+                                <div>
+                                    <button class="btn btn-outline-success btn-xs font-weight-bold mr-1" type="button" onclick="autoCalcEditCashFromBooth()" title="Auto-calculate cash needed to settle booth">
+                                        <i class="fas fa-coins mr-1"></i>Auto Cash
+                                    </button>
+                                    <button class="btn btn-outline-info btn-xs font-weight-bold" type="button" onclick="autoCalcEditCountFromBooth()" title="Auto-calculate product count from unit price">
+                                        <i class="fas fa-calculator mr-1"></i>Auto Count
+                                    </button>
+                                </div>
+                                @endif
+                            </div>
                             <div class="input-group">
                                 <div class="input-group-prepend">
                                     <span class="input-group-text font-weight-bold text-info">$</span>
                                 </div>
                                 <input type="number" step="0.01" min="0" name="product_amount" id="product_amount" 
-                                       class="form-control form-control-lg @error('product_amount') is-invalid @enderror" 
+                                       class="form-control form-control-lg font-weight-bold text-info @error('product_amount') is-invalid @enderror" 
                                        placeholder="0.00" value="{{ old('product_amount', $payment->product_amount ?? ($payment->isProductExchange() ? $payment->amount : 0)) }}" oninput="updateLiveCalc()">
                             </div>
                             @error('product_amount')
@@ -263,7 +314,10 @@
                     </div>
                     <div class="calc-row" id="rowProductPart" style="{{ in_array($currentStructure, ['split', 'product_exchange']) ? '' : 'display: none;' }}">
                         <span class="text-muted"><i class="fas fa-boxes text-info mr-1"></i>Product Exchange Deduction:</span>
-                        <strong class="text-info" id="calcProductPortion">$0.00</strong>
+                        <span class="text-info font-weight-bold">
+                            <span id="calcProductPortion">$0.00</span>
+                            <span class="badge badge-info ml-1" id="calcProductCountBadge" style="display: none;"></span>
+                        </span>
                     </div>
                     <div class="calc-row total-row">
                         <span class="text-dark">Total Credited Payment:</span>
@@ -355,6 +409,7 @@ function onStructureChange(structure) {
     const wrapperStandard = document.getElementById('wrapperStandardAmount');
     const wrapperCash = document.getElementById('wrapperCashAmount');
     const wrapperProduct = document.getElementById('wrapperProductAmount');
+    const wrapperProductCount = document.getElementById('wrapperProductCount');
     const wrapperPaymentMethod = document.getElementById('wrapperPaymentMethod');
     const wrapperProductDetails = document.getElementById('wrapperProductDetails');
     const lblPaymentMethod = document.getElementById('lblPaymentMethod');
@@ -365,6 +420,7 @@ function onStructureChange(structure) {
         wrapperStandard.style.display = '';
         wrapperCash.style.display = 'none';
         wrapperProduct.style.display = 'none';
+        if (wrapperProductCount) wrapperProductCount.style.display = 'none';
         wrapperPaymentMethod.style.display = '';
         wrapperProductDetails.style.display = 'none';
         lblPaymentMethod.textContent = 'Payment Method';
@@ -374,6 +430,7 @@ function onStructureChange(structure) {
         wrapperStandard.style.display = 'none';
         wrapperCash.style.display = '';
         wrapperProduct.style.display = '';
+        if (wrapperProductCount) wrapperProductCount.style.display = '';
         wrapperPaymentMethod.style.display = '';
         wrapperProductDetails.style.display = '';
         lblPaymentMethod.textContent = 'Cash/Transfer Method';
@@ -383,12 +440,52 @@ function onStructureChange(structure) {
         wrapperStandard.style.display = 'none';
         wrapperCash.style.display = 'none';
         wrapperProduct.style.display = '';
+        if (wrapperProductCount) wrapperProductCount.style.display = '';
         wrapperPaymentMethod.style.display = 'none';
         wrapperProductDetails.style.display = '';
         rowCashPart.style.display = 'none';
         rowProductPart.style.display = '';
     }
 
+    updateLiveCalc();
+}
+
+const bookingTotal = {{ $payment->booking ? (float)$payment->booking->total_amount : 0 }};
+const bookingBalance = {{ $payment->booking ? (float)$payment->booking->balance_amount : 0 }};
+const currentPaymentAmount = {{ (float)$payment->amount }};
+
+function calculateEditProductSubtotal() {
+    const qty = parseFloat(document.getElementById('product_quantity')?.value) || 0;
+    const unitPrice = parseFloat(document.getElementById('product_unit_price')?.value) || 0;
+    if (qty > 0 && unitPrice > 0) {
+        document.getElementById('product_amount').value = (qty * unitPrice).toFixed(2);
+    }
+    updateLiveCalc();
+}
+
+function autoCalcEditCashFromBooth() {
+    const target = bookingTotal > 0 ? bookingTotal : (bookingBalance + currentPaymentAmount);
+    const prod = parseFloat(document.getElementById('product_amount')?.value) || 0;
+    if (target > 0) {
+        const cashNeeded = Math.max(0, target - prod);
+        document.getElementById('cash_amount').value = cashNeeded.toFixed(2);
+        updateLiveCalc();
+    }
+}
+
+function autoCalcEditCountFromBooth() {
+    const target = bookingTotal > 0 ? bookingTotal : (bookingBalance + currentPaymentAmount);
+    const cash = parseFloat(document.getElementById('cash_amount')?.value) || 0;
+    const unitPrice = parseFloat(document.getElementById('product_unit_price')?.value) || 0;
+    const neededProduct = Math.max(0, target - cash);
+
+    if (unitPrice > 0) {
+        const count = Math.ceil(neededProduct / unitPrice);
+        document.getElementById('product_quantity').value = count;
+        document.getElementById('product_amount').value = (count * unitPrice).toFixed(2);
+    } else {
+        document.getElementById('product_amount').value = neededProduct.toFixed(2);
+    }
     updateLiveCalc();
 }
 
@@ -416,6 +513,20 @@ function updateLiveCalc() {
     document.getElementById('calcCashPortion').textContent = '$' + cash.toFixed(2);
     document.getElementById('calcProductPortion').textContent = '$' + product.toFixed(2);
     document.getElementById('calcTotalCredited').textContent = '$' + total.toFixed(2);
+
+    const qty = parseFloat(document.getElementById('product_quantity')?.value) || 0;
+    const unitPrice = parseFloat(document.getElementById('product_unit_price')?.value) || 0;
+    const countBadge = document.getElementById('calcProductCountBadge');
+    if (countBadge) {
+        if (qty > 0) {
+            countBadge.style.display = 'inline-block';
+            countBadge.textContent = unitPrice > 0 
+                ? `${qty} units @ $${unitPrice.toFixed(2)}` 
+                : `${qty} units`;
+        } else {
+            countBadge.style.display = 'none';
+        }
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function() {

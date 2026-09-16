@@ -90,20 +90,36 @@ class PaymentController extends Controller
     public function store(Request $request)
     {
         $structure = $request->input('payment_structure', 'standard');
+        $productQuantity = null;
+        $productUnitPrice = null;
 
         if ($structure === 'split') {
             $request->validate([
                 'booking_id' => 'required|exists:book,id',
                 'cash_amount' => 'required|numeric|min:0.01',
                 'cash_payment_method' => 'required|in:cash,bank_transfer,online,check',
-                'product_amount' => 'required|numeric|min:0.01',
+                'product_amount' => 'nullable|numeric|min:0',
+                'product_quantity' => 'nullable|numeric|min:0',
+                'product_unit_price' => 'nullable|numeric|min:0',
                 'product_details' => 'required|string|max:2000',
                 'transaction_id' => 'nullable|string|max:100',
                 'notes' => 'nullable|string',
             ]);
 
             $cashAmount = round((float) $request->cash_amount, 2);
-            $productAmount = round((float) $request->product_amount, 2);
+            $productQuantity = $request->filled('product_quantity') ? round((float) $request->product_quantity, 2) : null;
+            $productUnitPrice = $request->filled('product_unit_price') ? round((float) $request->product_unit_price, 2) : null;
+
+            if ($productQuantity !== null && $productUnitPrice !== null && $productQuantity > 0 && $productUnitPrice > 0) {
+                $productAmount = round($productQuantity * $productUnitPrice, 2);
+            } else {
+                $productAmount = round((float) $request->product_amount, 2);
+            }
+
+            if ($productAmount <= 0) {
+                return back()->withErrors(['product_amount' => 'Product exchange deduction value must be greater than 0.'])->withInput();
+            }
+
             $totalAmount = round($cashAmount + $productAmount, 2);
             $paymentMethod = Payment::METHOD_SPLIT;
             $cashPaymentMethod = $request->cash_payment_method;
@@ -111,14 +127,28 @@ class PaymentController extends Controller
         } elseif ($structure === 'product_exchange') {
             $request->validate([
                 'booking_id' => 'required|exists:book,id',
-                'product_amount' => 'required|numeric|min:0.01',
+                'product_amount' => 'nullable|numeric|min:0',
+                'product_quantity' => 'nullable|numeric|min:0',
+                'product_unit_price' => 'nullable|numeric|min:0',
                 'product_details' => 'required|string|max:2000',
                 'transaction_id' => 'nullable|string|max:100',
                 'notes' => 'nullable|string',
             ]);
 
             $cashAmount = 0.00;
-            $productAmount = round((float) $request->product_amount, 2);
+            $productQuantity = $request->filled('product_quantity') ? round((float) $request->product_quantity, 2) : null;
+            $productUnitPrice = $request->filled('product_unit_price') ? round((float) $request->product_unit_price, 2) : null;
+
+            if ($productQuantity !== null && $productUnitPrice !== null && $productQuantity > 0 && $productUnitPrice > 0) {
+                $productAmount = round($productQuantity * $productUnitPrice, 2);
+            } else {
+                $productAmount = round((float) ($request->product_amount ?: $request->amount), 2);
+            }
+
+            if ($productAmount <= 0) {
+                return back()->withErrors(['product_amount' => 'Product exchange deduction value must be greater than 0.'])->withInput();
+            }
+
             $totalAmount = $productAmount;
             $paymentMethod = Payment::METHOD_PRODUCT_EXCHANGE;
             $cashPaymentMethod = null;
@@ -171,7 +201,12 @@ class PaymentController extends Controller
         // Prepare combined notes with product exchange details for full transparency
         $combinedNotes = $request->notes;
         if (! empty($productDetails)) {
-            $itemSummary = '[Product Exchange: $' . number_format($productAmount, 2) . ' - ' . $productDetails . ']';
+            $prodCalcStr = '';
+            if ($productQuantity !== null && $productUnitPrice !== null && $productQuantity > 0 && $productUnitPrice > 0) {
+                $qtyClean = (floor($productQuantity) == $productQuantity) ? (int)$productQuantity : $productQuantity;
+                $prodCalcStr = "{$qtyClean} units @ $" . number_format($productUnitPrice, 2) . ' = ';
+            }
+            $itemSummary = '[Product Exchange: ' . $prodCalcStr . '$' . number_format($productAmount, 2) . ' - ' . $productDetails . ']';
             $combinedNotes = ! empty($combinedNotes) ? $combinedNotes . "\n" . $itemSummary : $itemSummary;
         }
 
@@ -181,6 +216,8 @@ class PaymentController extends Controller
             'amount' => $totalAmount,
             'cash_amount' => $cashAmount,
             'product_amount' => $productAmount,
+            'product_quantity' => $productQuantity,
+            'product_unit_price' => $productUnitPrice,
             'product_details' => $productDetails,
             'payment_method' => $paymentMethod,
             'cash_payment_method' => $cashPaymentMethod,
@@ -314,6 +351,9 @@ class PaymentController extends Controller
                     'amount' => (float) $payment->amount,
                     'cash_amount' => (float) ($payment->cash_amount ?? 0),
                     'product_amount' => (float) ($payment->product_amount ?? 0),
+                    'product_quantity' => (float) ($payment->product_quantity ?? 0),
+                    'product_quantity_formatted' => $payment->product_quantity_formatted,
+                    'product_unit_price' => (float) ($payment->product_unit_price ?? 0),
                     'product_details' => $payment->product_details,
                     'payment_method' => $payment->payment_method,
                     'cash_payment_method' => $payment->cash_payment_method,
@@ -362,6 +402,8 @@ class PaymentController extends Controller
             'amount' => 'nullable|numeric|min:0',
             'cash_amount' => 'nullable|numeric|min:0',
             'product_amount' => 'nullable|numeric|min:0',
+            'product_quantity' => 'nullable|numeric|min:0',
+            'product_unit_price' => 'nullable|numeric|min:0',
             'product_details' => 'nullable|string|max:1000',
             'payment_method' => 'required|string',
             'cash_payment_method' => 'nullable|string|max:50',
@@ -376,17 +418,35 @@ class PaymentController extends Controller
 
             $structure = $request->input('payment_structure', 'standard');
             $paidAt = $request->paid_at ? \Carbon\Carbon::parse($request->paid_at) : ($payment->paid_at ?? now());
+            $productQuantity = null;
+            $productUnitPrice = null;
 
             if ($structure === 'split') {
                 $cashAmount = (float) $request->input('cash_amount', 0);
-                $productAmount = (float) $request->input('product_amount', 0);
+                $productQuantity = $request->filled('product_quantity') ? round((float) $request->product_quantity, 2) : null;
+                $productUnitPrice = $request->filled('product_unit_price') ? round((float) $request->product_unit_price, 2) : null;
+
+                if ($productQuantity !== null && $productUnitPrice !== null && $productQuantity > 0 && $productUnitPrice > 0) {
+                    $productAmount = round($productQuantity * $productUnitPrice, 2);
+                } else {
+                    $productAmount = (float) $request->input('product_amount', 0);
+                }
+
                 $totalAmount = $cashAmount + $productAmount;
                 $paymentMethod = Payment::METHOD_SPLIT;
                 $cashPaymentMethod = $request->input('cash_payment_method') ?: ($request->input('payment_method') !== Payment::METHOD_SPLIT ? $request->input('payment_method') : 'cash');
                 $productDetails = $request->input('product_details');
             } elseif ($structure === 'product_exchange') {
                 $cashAmount = 0.0;
-                $productAmount = (float) ($request->input('product_amount') ?: $request->input('amount', 0));
+                $productQuantity = $request->filled('product_quantity') ? round((float) $request->product_quantity, 2) : null;
+                $productUnitPrice = $request->filled('product_unit_price') ? round((float) $request->product_unit_price, 2) : null;
+
+                if ($productQuantity !== null && $productUnitPrice !== null && $productQuantity > 0 && $productUnitPrice > 0) {
+                    $productAmount = round($productQuantity * $productUnitPrice, 2);
+                } else {
+                    $productAmount = (float) ($request->input('product_amount') ?: $request->input('amount', 0));
+                }
+
                 $totalAmount = $productAmount;
                 $paymentMethod = Payment::METHOD_PRODUCT_EXCHANGE;
                 $cashPaymentMethod = null;
@@ -408,6 +468,8 @@ class PaymentController extends Controller
                 'amount' => $totalAmount,
                 'cash_amount' => $cashAmount,
                 'product_amount' => $productAmount,
+                'product_quantity' => $productQuantity,
+                'product_unit_price' => $productUnitPrice,
                 'product_details' => $productDetails,
                 'payment_method' => $paymentMethod,
                 'cash_payment_method' => $cashPaymentMethod,

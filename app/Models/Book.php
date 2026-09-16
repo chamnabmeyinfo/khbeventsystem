@@ -221,6 +221,36 @@ class Book extends Model
     }
 
     /**
+     * Calculate real money (cash/bank) paid amount
+     */
+    public function calculateCashPaidAmount(): float
+    {
+        return (float) $this->payments()
+            ->where('status', Payment::STATUS_COMPLETED)
+            ->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(cash_amount, CASE WHEN payment_method != "product_exchange" THEN amount ELSE 0 END)'));
+    }
+
+    /**
+     * Calculate product barter deduction paid amount
+     */
+    public function calculateProductPaidAmount(): float
+    {
+        return (float) $this->payments()
+            ->where('status', Payment::STATUS_COMPLETED)
+            ->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(product_amount, CASE WHEN payment_method = "product_exchange" THEN amount ELSE 0 END)'));
+    }
+
+    /**
+     * Calculate total product barter count/quantity exchanged
+     */
+    public function calculateProductCount(): float
+    {
+        return (float) $this->payments()
+            ->where('status', Payment::STATUS_COMPLETED)
+            ->sum('product_quantity');
+    }
+
+    /**
      * Update payment amounts
      */
     public function updatePaymentAmounts()
@@ -239,3 +269,4 @@ class Book extends Model
         $this->save();
     }
 }
+

@@ -15,6 +15,8 @@ class Payment extends Model
         'amount',
         'cash_amount',
         'product_amount',
+        'product_quantity',
+        'product_unit_price',
         'product_details',
         'payment_method',
         'cash_payment_method',
@@ -29,6 +31,8 @@ class Payment extends Model
         'amount' => 'decimal:2',
         'cash_amount' => 'decimal:2',
         'product_amount' => 'decimal:2',
+        'product_quantity' => 'decimal:2',
+        'product_unit_price' => 'decimal:2',
         'paid_at' => 'datetime',
     ];
 
@@ -88,20 +92,42 @@ class Payment extends Model
     }
 
     /**
+     * Get clean formatted product quantity (e.g. 10 instead of 10.00, or 10.5)
+     */
+    public function getProductQuantityFormattedAttribute(): ?string
+    {
+        if ($this->product_quantity === null || $this->product_quantity === '') {
+            return null;
+        }
+        $val = (float) $this->product_quantity;
+        return (floor($val) == $val) ? (string) (int) $val : rtrim(rtrim(number_format($val, 2, '.', ''), '0'), '.');
+    }
+
+    /**
      * Get human-readable method label with breakdown
      */
     public function getMethodLabelAttribute(): string
     {
+        $qtyStr = $this->product_quantity_formatted;
+        $unitPrice = (float) ($this->product_unit_price ?? 0);
+        $prodMeta = '';
+        if ($qtyStr && $unitPrice > 0) {
+            $prodMeta = " [{$qtyStr} @ $" . number_format($unitPrice, 2) . ']';
+        } elseif ($qtyStr) {
+            $prodMeta = " [{$qtyStr} items]";
+        }
+
         if ($this->isSplit()) {
             $cashPart = (float) ($this->cash_amount ?? 0);
             $prodPart = (float) ($this->product_amount ?? 0);
             $cashName = ucfirst(str_replace('_', ' ', $this->cash_payment_method ?? 'Cash'));
 
-            return "Split ($" . number_format($cashPart, 2) . " {$cashName} + $" . number_format($prodPart, 2) . ' Product)';
+            return "Split ($" . number_format($cashPart, 2) . " {$cashName} + $" . number_format($prodPart, 2) . " Product{$prodMeta})";
         }
 
         if ($this->isProductExchange()) {
-            return 'Product Exchange';
+            $prodPart = (float) ($this->product_amount ?? $this->amount ?? 0);
+            return "Product Exchange ($" . number_format($prodPart, 2) . "{$prodMeta})";
         }
 
         return match ($this->payment_method) {
