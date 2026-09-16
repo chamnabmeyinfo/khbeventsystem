@@ -41,18 +41,7 @@ class BookController extends Controller
             return $this->lazyLoad($request);
         }
 
-        $filters = [
-            'search' => $request->input('search'),
-            'date_from' => $request->input('date_from'),
-            'date_to' => $request->input('date_to'),
-            'type' => $request->input('type'),
-            'floor_plan_id' => $request->input('floor_plan_id'),
-            'status' => $request->input('status'),
-            'amount_min' => $request->input('amount_min'),
-            'amount_max' => $request->input('amount_max'),
-            'booth_count_min' => $request->input('booth_count_min'),
-            'date_range' => $request->input('date_range', 'all'),
-        ];
+        $filters = $this->extractFilters($request);
 
         $groupBy = $request->input('group_by', 'none');
 
@@ -72,6 +61,8 @@ class BookController extends Controller
 
         $restrictToOwnBookings = $this->restrictToOwnBookings();
         $floorPlans = FloorPlan::where('is_active', true)->orderBy('is_default', 'desc')->orderBy('name')->get();
+        $teamUsers = \App\Models\User::orderBy('username')->get(['id', 'username', 'name', 'avatar']);
+        $events = \Illuminate\Support\Facades\Schema::hasTable('events') ? \App\Models\Event::where('is_active', true)->orderBy('title')->get(['id', 'title']) : collect([]);
 
         try {
             $statusSettings = \App\Models\BookingStatusSetting::getActiveStatuses();
@@ -81,15 +72,12 @@ class BookController extends Controller
 
         $dateRange = $filters['date_range'];
 
-        return view('books.index', compact('books', 'total', 'groupBy', 'dateRange', 'groupedBooks', 'restrictToOwnBookings', 'boothsByBookId', 'floorPlans', 'statusSettings'));
+        return view('books.index', compact('books', 'total', 'groupBy', 'dateRange', 'groupedBooks', 'restrictToOwnBookings', 'boothsByBookId', 'floorPlans', 'statusSettings', 'teamUsers', 'events'));
     }
 
-    /**
-     * JSON fragment for #bookingsContainer when filters change (no full page reload).
-     */
-    private function bookListPartialJson(Request $request)
+    private function extractFilters(Request $request): array
     {
-        $filters = [
+        return [
             'search' => $request->input('search'),
             'date_from' => $request->input('date_from'),
             'date_to' => $request->input('date_to'),
@@ -100,7 +88,22 @@ class BookController extends Controller
             'amount_max' => $request->input('amount_max'),
             'booth_count_min' => $request->input('booth_count_min'),
             'date_range' => $request->input('date_range', 'all'),
+            'user_id' => $request->input('user_id'),
+            'payment_status' => $request->input('payment_status'),
+            'payment_method' => $request->input('payment_method'),
+            'booth_number' => $request->input('booth_number'),
+            'event_id' => $request->input('event_id'),
+            'sort_by' => $request->input('sort_by', 'date_book'),
+            'sort_order' => $request->input('sort_order', 'desc'),
         ];
+    }
+
+    /**
+     * JSON fragment for #bookingsContainer when filters change (no full page reload).
+     */
+    private function bookListPartialJson(Request $request)
+    {
+        $filters = $this->extractFilters($request);
 
         $groupBy = $request->input('group_by', 'none');
 
@@ -139,30 +142,20 @@ class BookController extends Controller
     private function countActiveBookFilters(Request $request): int
     {
         $n = 0;
-        if ($request->filled('search')) {
-            $n++;
-        }
-        if ($request->filled('date_from') || $request->filled('date_to')) {
-            $n++;
-        }
-        if ($request->filled('type')) {
-            $n++;
-        }
-        if ($request->filled('floor_plan_id')) {
-            $n++;
-        }
-        if ($request->filled('status')) {
-            $n++;
-        }
-        if ($request->filled('amount_min') || $request->filled('amount_max')) {
-            $n++;
-        }
-        if ($request->filled('booth_count_min')) {
-            $n++;
-        }
-        if ($request->input('date_range') && $request->input('date_range') !== 'all') {
-            $n++;
-        }
+        if ($request->filled('search')) $n++;
+        if ($request->filled('date_from') || $request->filled('date_to')) $n++;
+        if ($request->filled('type')) $n++;
+        if ($request->filled('floor_plan_id')) $n++;
+        if ($request->filled('status')) $n++;
+        if ($request->filled('amount_min') || $request->filled('amount_max')) $n++;
+        if ($request->filled('booth_count_min')) $n++;
+        if ($request->input('date_range') && $request->input('date_range') !== 'all') $n++;
+        if ($request->filled('user_id')) $n++;
+        if ($request->filled('payment_status')) $n++;
+        if ($request->filled('payment_method')) $n++;
+        if ($request->filled('booth_number')) $n++;
+        if ($request->filled('event_id')) $n++;
+        if ($request->filled('sort_by') && $request->input('sort_by') !== 'date_book') $n++;
 
         return $n;
     }
@@ -172,109 +165,19 @@ class BookController extends Controller
      */
     public function lazyLoad(Request $request)
     {
-        $with = ['client', 'user', 'floorPlan', 'statusSetting'];
-        if (\Schema::hasTable('events')) {
-            $with[] = 'floorPlan.event';
-        }
-        $query = Book::with($with);
+        $filters = $this->extractFilters($request);
+        $page = (int) $request->input('page', 1);
+        $perPage = 20;
 
-        if ($this->restrictToOwnBookings()) {
-            $query->where('userid', auth()->id());
-        }
+        $result = $this->bookService->getBookings($filters, $perPage, $page);
+        $books = $result['books'];
+        $total = $result['total'];
+        $boothsByBookId = $result['boothsByBookId'];
 
-        // Search functionality (exact same as index)
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->whereHas('client', function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('company', 'like', "%{$search}%");
-            })->orWhereHas('user', function ($q) use ($search) {
-                $q->where('username', 'like', "%{$search}%");
-            });
-        }
-
-        // Date filter (exact same as index)
-        if ($request->filled('date_from')) {
-            $query->whereDate('date_book', '>=', $request->date_from);
-        }
-        if ($request->filled('date_to')) {
-            $query->whereDate('date_book', '<=', $request->date_to);
-        }
-
-        // Type filter (exact same as index)
-        if ($request->filled('type')) {
-            $query->where('type', $request->type);
-        }
-
-        // Floor plan filter
-        if ($request->filled('floor_plan_id')) {
-            $query->where('floor_plan_id', $request->floor_plan_id);
-        }
-
-        // Status filter
-        if ($request->filled('status')) {
-            $query->where('status', (int) $request->status);
-        }
-
-        // Amount range filter
-        if ($request->filled('amount_min') && is_numeric($request->amount_min)) {
-            $query->where('total_amount', '>=', (float) $request->amount_min);
-        }
-        if ($request->filled('amount_max') && is_numeric($request->amount_max)) {
-            $query->where('total_amount', '<=', (float) $request->amount_max);
-        }
-
-        // Min booth count filter
-        if ($request->filled('booth_count_min') && is_numeric($request->booth_count_min) && (int) $request->booth_count_min > 0) {
-            $driver = $query->getConnection()->getDriverName();
-            $minBooths = (int) $request->booth_count_min;
-            if ($driver === 'mysql') {
-                $query->whereRaw('JSON_LENGTH(COALESCE(boothid, \'[]\')) >= ?', [$minBooths]);
-            } elseif ($driver === 'sqlite') {
-                $query->whereRaw('json_array_length(COALESCE(boothid, \'[]\')) >= ?', [$minBooths]);
-            }
-        }
-        // Group By filter (exact same as index)
-        $dateRange = $request->input('date_range', 'all');
-
-        // Apply date range filter if specified
-        if ($dateRange !== 'all') {
-            $now = now();
-            switch ($dateRange) {
-                case 'today':
-                    $query->whereDate('date_book', $now->toDateString());
-                    break;
-                case '3days':
-                    $query->whereDate('date_book', '>=', $now->copy()->subDays(3)->toDateString());
-                    break;
-                case '7days':
-                    $query->whereDate('date_book', '>=', $now->copy()->subDays(7)->toDateString());
-                    break;
-                case '14days':
-                    $query->whereDate('date_book', '>=', $now->copy()->subDays(14)->toDateString());
-                    break;
-                case 'more':
-                    $query->whereDate('date_book', '<', $now->copy()->subDays(14)->toDateString());
-                    break;
-            }
-        }
-
-        // Use same ordering and limit as initial load
-        $page = $request->input('page', 1);
-        $perPage = 20; // Same as initial load limit(20)
         $offset = ($page - 1) * $perPage;
-
-        // Get total before pagination
-        $total = $query->count();
-
-        // Use exact same ordering as index method
-        $books = $query->latest('date_book')->offset($offset)->limit($perPage)->get();
         $hasMore = ($offset + $books->count()) < $total;
 
-        $boothsByBookId = $this->loadBoothsForBooks($books);
-
-        $view = $request->input('view', 'table'); // 'table' or 'card'
-        $groupBy = $request->input('group_by', 'none');
+        $view = $request->input('view', 'table'); // 'table' or 'cards'
         $html = '';
 
         foreach ($books as $i => $book) {

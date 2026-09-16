@@ -37,9 +37,17 @@ class BookService
         // Get total count before pagination
         $total = $query->count();
 
+        // Sorting
+        $sortBy = $filters['sort_by'] ?? 'date_book';
+        $sortOrder = strtolower($filters['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+        if (in_array($sortBy, ['date_book', 'id', 'total_amount', 'paid_amount', 'created_at'])) {
+            $query->orderBy($sortBy, $sortOrder);
+        } else {
+            $query->latest('date_book');
+        }
+
         // Get paginated results
-        $books = $query->latest('date_book')
-            ->skip(($page - 1) * $perPage)
+        $books = $query->skip(($page - 1) * $perPage)
             ->take($perPage)
             ->get();
 
@@ -169,15 +177,27 @@ class BookService
      */
     private function applyFilters($query, array $filters): void
     {
-        // Search functionality
+        // Search functionality (client name/company, team user, or booking ID)
         if (! empty($filters['search'])) {
-            $search = $filters['search'];
-            $query->whereHas('client', function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('company', 'like', "%{$search}%");
-            })->orWhereHas('user', function ($q) use ($search) {
-                $q->where('username', 'like', "%{$search}%");
+            $search = trim($filters['search']);
+            $cleanId = ltrim($search, '#');
+            $query->where(function ($q) use ($search, $cleanId) {
+                $q->whereHas('client', function ($sub) use ($search) {
+                    $sub->where('name', 'like', "%{$search}%")
+                        ->orWhere('company', 'like', "%{$search}%");
+                })->orWhereHas('user', function ($sub) use ($search) {
+                    $sub->where('username', 'like', "%{$search}%")
+                        ->orWhere('name', 'like', "%{$search}%");
+                });
+                if (is_numeric($cleanId)) {
+                    $q->orWhere('id', (int) $cleanId);
+                }
             });
+        }
+
+        // Team user filter (booked by)
+        if (! empty($filters['user_id'])) {
+            $query->where('userid', $filters['user_id']);
         }
 
         // Date filter
@@ -189,8 +209,12 @@ class BookService
         }
 
         // Type filter
-        if (isset($filters['type'])) {
-            $query->where('type', $filters['type']);
+        if (isset($filters['type']) && $filters['type'] !== '') {
+            if (is_array($filters['type'])) {
+                $query->whereIn('type', $filters['type']);
+            } else {
+                $query->where('type', $filters['type']);
+            }
         }
 
         // Floor plan filter
@@ -198,9 +222,67 @@ class BookService
             $query->where('floor_plan_id', $filters['floor_plan_id']);
         }
 
+        // Event filter
+        if (! empty($filters['event_id'])) {
+            $eventId = $filters['event_id'];
+            $query->whereHas('floorPlan', function ($fpQuery) use ($eventId) {
+                $fpQuery->where('event_id', $eventId);
+            });
+        }
+
         // Status filter
-        if (isset($filters['status'])) {
-            $query->where('status', (int) $filters['status']);
+        if (isset($filters['status']) && $filters['status'] !== '') {
+            if (is_array($filters['status'])) {
+                $query->whereIn('status', array_map('intval', $filters['status']));
+            } else {
+                $query->where('status', (int) $filters['status']);
+            }
+        }
+
+        // Payment status filter (paid, partial, unpaid)
+        if (! empty($filters['payment_status'])) {
+            if ($filters['payment_status'] === 'paid') {
+                $query->where(function ($q) {
+                    $q->where('balance_amount', '<=', 0)
+                      ->orWhere('status', 2);
+                });
+            } elseif ($filters['payment_status'] === 'partial') {
+                $query->where('paid_amount', '>', 0)
+                      ->where('balance_amount', '>', 0);
+            } elseif ($filters['payment_status'] === 'unpaid') {
+                $query->where(function ($q) {
+                    $q->whereNull('paid_amount')
+                      ->orWhere('paid_amount', '<=', 0);
+                });
+            }
+        }
+
+        // Payment method filter (cash, bank_transfer, product_exchange, split)
+        if (! empty($filters['payment_method'])) {
+            $method = $filters['payment_method'];
+            $query->whereHas('payments', function ($payQ) use ($method) {
+                if ($method === 'split') {
+                    $payQ->where('is_split', true)->orWhere('payment_method', 'split');
+                } else {
+                    $payQ->where('payment_method', $method);
+                }
+            });
+        }
+
+        // Specific booth number search
+        if (! empty($filters['booth_number'])) {
+            $boothNum = trim($filters['booth_number']);
+            $matchingBoothIds = \App\Models\Booth::where('booth_number', 'like', "%{$boothNum}%")->pluck('id')->toArray();
+            if (! empty($matchingBoothIds)) {
+                $query->where(function ($q) use ($matchingBoothIds) {
+                    foreach ($matchingBoothIds as $bid) {
+                        $q->orWhereJsonContains('boothid', (int) $bid)
+                          ->orWhereJsonContains('boothid', (string) $bid);
+                    }
+                });
+            } else {
+                $query->whereRaw('1 = 0');
+            }
         }
 
         // Amount range filter
@@ -229,14 +311,26 @@ class BookService
                 case 'today':
                     $query->whereDate('date_book', $now->toDateString());
                     break;
+                case 'yesterday':
+                    $query->whereDate('date_book', $now->copy()->subDay()->toDateString());
+                    break;
                 case '3days':
                     $query->whereDate('date_book', '>=', $now->copy()->subDays(3)->toDateString());
                     break;
                 case '7days':
                     $query->whereDate('date_book', '>=', $now->copy()->subDays(7)->toDateString());
                     break;
+                case 'this_week':
+                    $query->whereBetween('date_book', [$now->copy()->startOfWeek()->toDateTimeString(), $now->copy()->endOfWeek()->toDateTimeString()]);
+                    break;
                 case '14days':
                     $query->whereDate('date_book', '>=', $now->copy()->subDays(14)->toDateString());
+                    break;
+                case 'this_month':
+                    $query->whereBetween('date_book', [$now->copy()->startOfMonth()->toDateTimeString(), $now->copy()->endOfMonth()->toDateTimeString()]);
+                    break;
+                case 'last_month':
+                    $query->whereBetween('date_book', [$now->copy()->subMonth()->startOfMonth()->toDateTimeString(), $now->copy()->subMonth()->endOfMonth()->toDateTimeString()]);
                     break;
                 case 'more':
                     $query->whereDate('date_book', '<', $now->copy()->subDays(14)->toDateString());

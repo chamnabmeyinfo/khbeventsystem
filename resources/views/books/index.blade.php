@@ -5,7 +5,7 @@
 
 @push('styles')
 <link rel="stylesheet" href="{{ asset('css/dashboard-looker.css') }}?v=3.6">
-<link rel="stylesheet" href="{{ asset('css/books-page-index.css') }}?v=1.4">
+<link rel="stylesheet" href="{{ asset('css/books-page-index.css') }}?v=1.5">
 <link rel="stylesheet" href="{{ asset('css/booths-on-books.css') }}?v=2.4">
 @endpush
 
@@ -105,7 +105,11 @@
 
     <!-- Filter Bar -->
     @php
-        $hasActiveFilters = request()->hasAny(['search', 'date_from', 'date_to', 'type', 'floor_plan_id', 'status', 'amount_min', 'amount_max', 'booth_count_min']) || (request('date_range') && request('date_range') !== 'all');
+        $hasAdvancedActive = request()->hasAny([
+            'date_from', 'date_to', 'type', 'amount_min', 'amount_max', 'booth_count_min', 
+            'event_id', 'payment_method', 'booth_number'
+        ]) || (request('date_range') && request('date_range') !== 'all') || (request('sort_by') && request('sort_by') !== 'date_book');
+
         $activeFilterCount = 0;
         if (request('search')) $activeFilterCount++;
         if (request('date_from') || request('date_to')) $activeFilterCount++;
@@ -115,6 +119,12 @@
         if (request('amount_min') || request('amount_max')) $activeFilterCount++;
         if (request('booth_count_min')) $activeFilterCount++;
         if (request('date_range') && request('date_range') !== 'all') $activeFilterCount++;
+        if (request('user_id')) $activeFilterCount++;
+        if (request('payment_status')) $activeFilterCount++;
+        if (request('payment_method')) $activeFilterCount++;
+        if (request('booth_number')) $activeFilterCount++;
+        if (request('event_id')) $activeFilterCount++;
+        if (request('sort_by') && request('sort_by') !== 'date_book') $activeFilterCount++;
     @endphp
     <div class="filter-bar">
         <form method="GET" action="{{ route('books.index') }}" id="filterForm">
@@ -124,7 +134,7 @@
                     <span class="filter-badge {{ $activeFilterCount > 0 ? '' : 'd-none' }}" id="booksFilterBadge">{{ $activeFilterCount }} active</span>
                 </h6>
                 <span class="filter-toggle" onclick="document.getElementById('filterAdvanced').classList.toggle('d-none'); this.querySelector('i').classList.toggle('fa-chevron-down'); this.querySelector('i').classList.toggle('fa-chevron-up');">
-                    <i class="fas fa-chevron-down"></i> <span>Advanced</span>
+                    <i class="fas {{ $hasAdvancedActive ? 'fa-chevron-up' : 'fa-chevron-down' }}"></i> <span>Advanced</span>
                 </span>
             </div>
 
@@ -133,27 +143,21 @@
                 <div>
                     <label class="form-label small mb-1">Search</label>
                     <input type="text" name="search" class="form-control form-control-modern form-control-sm"
-                           placeholder="Client, company, user..." value="{{ request('search') }}">
+                           placeholder="Client, contact, user..." value="{{ request('search') }}">
                 </div>
                 <div>
-                    <label class="form-label small mb-1">Date From</label>
-                    <input type="date" name="date_from" class="form-control form-control-modern form-control-sm" value="{{ request('date_from') }}">
-                </div>
-                <div>
-                    <label class="form-label small mb-1">Date To</label>
-                    <input type="date" name="date_to" class="form-control form-control-modern form-control-sm" value="{{ request('date_to') }}">
-                </div>
-                <div>
-                    <label class="form-label small mb-1">Type</label>
-                    <select name="type" class="form-control form-control-modern form-control-sm">
-                        <option value="">All Types</option>
-                        <option value="1" {{ request('type') == '1' ? 'selected' : '' }}>Regular</option>
-                        <option value="2" {{ request('type') == '2' ? 'selected' : '' }}>Special</option>
-                        <option value="3" {{ request('type') == '3' ? 'selected' : '' }}>Temporary</option>
+                    <label class="form-label small mb-1">Booked By (Team)</label>
+                    <select name="user_id" class="form-control form-control-modern form-control-sm">
+                        <option value="">All Team Members</option>
+                        @foreach($teamUsers ?? [] as $tUser)
+                            <option value="{{ $tUser->id }}" {{ request('user_id') == (string)$tUser->id ? 'selected' : '' }}>
+                                {{ $tUser->name ?? $tUser->username }} ({{ $tUser->username }})
+                            </option>
+                        @endforeach
                     </select>
                 </div>
                 <div>
-                    <label class="form-label small mb-1">Status</label>
+                    <label class="form-label small mb-1">Booking Status</label>
                     <select name="status" class="form-control form-control-modern form-control-sm">
                         <option value="">All Statuses</option>
                         @foreach($statusSettings ?? [] as $sts)
@@ -166,6 +170,15 @@
                         <option value="4" {{ request('status') == '4' ? 'selected' : '' }}>Paid</option>
                         <option value="6" {{ request('status') == '6' ? 'selected' : '' }}>Cancelled</option>
                         @endif
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label small mb-1">Payment Status</label>
+                    <select name="payment_status" class="form-control form-control-modern form-control-sm">
+                        <option value="">All Payments</option>
+                        <option value="paid" {{ request('payment_status') == 'paid' ? 'selected' : '' }}>Paid (Fully Settled)</option>
+                        <option value="partial" {{ request('payment_status') == 'partial' ? 'selected' : '' }}>Partial Paid</option>
+                        <option value="unpaid" {{ request('payment_status') == 'unpaid' ? 'selected' : '' }}>Unpaid (No Payment)</option>
                     </select>
                 </div>
                 <div>
@@ -188,8 +201,83 @@
             </div>
 
             <!-- Advanced Filters (collapsible) -->
-            <div id="filterAdvanced" class="filter-row-advanced {{ $hasActiveFilters && (request('amount_min') || request('amount_max') || request('booth_count_min') || request('date_range')) ? '' : 'd-none' }}">
+            <div id="filterAdvanced" class="filter-row-advanced {{ $hasAdvancedActive ? '' : 'd-none' }}">
                 <div class="row g-3">
+                    <div class="col-md-3 col-sm-6">
+                        <label class="form-label small mb-1">Event</label>
+                        <select name="event_id" class="form-control form-control-modern form-control-sm">
+                            <option value="">All Events</option>
+                            @foreach($events ?? [] as $ev)
+                                <option value="{{ $ev->id }}" {{ request('event_id') == (string)$ev->id ? 'selected' : '' }}>{{ $ev->title }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small mb-1">Type</label>
+                        <select name="type" class="form-control form-control-modern form-control-sm">
+                            <option value="">All Types</option>
+                            <option value="1" {{ request('type') == '1' ? 'selected' : '' }}>Regular</option>
+                            <option value="2" {{ request('type') == '2' ? 'selected' : '' }}>Special</option>
+                            <option value="3" {{ request('type') == '3' ? 'selected' : '' }}>Temporary</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small mb-1">Payment Method</label>
+                        <select name="payment_method" class="form-control form-control-modern form-control-sm">
+                            <option value="">All Methods</option>
+                            <option value="cash" {{ request('payment_method') == 'cash' ? 'selected' : '' }}>Cash</option>
+                            <option value="bank_transfer" {{ request('payment_method') == 'bank_transfer' ? 'selected' : '' }}>Bank Transfer / ABA</option>
+                            <option value="product_exchange" {{ request('payment_method') == 'product_exchange' ? 'selected' : '' }}>Product Exchange / Barter</option>
+                            <option value="split" {{ request('payment_method') == 'split' ? 'selected' : '' }}>Split Payment</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small mb-1">Booth Number</label>
+                        <input type="text" name="booth_number" class="form-control form-control-modern form-control-sm"
+                               placeholder="e.g. A12, B05" value="{{ request('booth_number') }}">
+                    </div>
+                    <div class="col-md-1 col-sm-6">
+                        <label class="form-label small mb-1">Min Booths</label>
+                        <input type="number" name="booth_count_min" class="form-control form-control-modern form-control-sm" min="1" placeholder="1" value="{{ request('booth_count_min') }}">
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small mb-1">Sort By</label>
+                        <div class="input-group input-group-sm">
+                            <select name="sort_by" class="form-control form-control-modern form-control-sm">
+                                <option value="date_book" {{ request('sort_by', 'date_book') == 'date_book' ? 'selected' : '' }}>Date</option>
+                                <option value="id" {{ request('sort_by') == 'id' ? 'selected' : '' }}>ID</option>
+                                <option value="total_amount" {{ request('sort_by') == 'total_amount' ? 'selected' : '' }}>Amount</option>
+                                <option value="paid_amount" {{ request('sort_by') == 'paid_amount' ? 'selected' : '' }}>Paid</option>
+                                <option value="booth_count" {{ request('sort_by') == 'booth_count' ? 'selected' : '' }}>Booths</option>
+                            </select>
+                            <select name="sort_order" class="form-control form-control-modern form-control-sm" style="max-width: 75px;">
+                                <option value="desc" {{ request('sort_order', 'desc') == 'desc' ? 'selected' : '' }}>DESC</option>
+                                <option value="asc" {{ request('sort_order') == 'asc' ? 'selected' : '' }}>ASC</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small mb-1">Date From</label>
+                        <input type="date" name="date_from" class="form-control form-control-modern form-control-sm" value="{{ request('date_from') }}">
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small mb-1">Date To</label>
+                        <input type="date" name="date_to" class="form-control form-control-modern form-control-sm" value="{{ request('date_to') }}">
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <label class="form-label small mb-1">Date Preset</label>
+                        <select name="date_range" class="form-control form-control-modern form-control-sm">
+                            <option value="all" {{ request('date_range', 'all') == 'all' ? 'selected' : '' }}>All Dates</option>
+                            <option value="today" {{ request('date_range') == 'today' ? 'selected' : '' }}>Today</option>
+                            <option value="yesterday" {{ request('date_range') == 'yesterday' ? 'selected' : '' }}>Yesterday</option>
+                            <option value="this_week" {{ request('date_range') == 'this_week' ? 'selected' : '' }}>This Week</option>
+                            <option value="7days" {{ request('date_range') == '7days' ? 'selected' : '' }}>Last 7 Days</option>
+                            <option value="14days" {{ request('date_range') == '14days' ? 'selected' : '' }}>Last 14 Days</option>
+                            <option value="this_month" {{ request('date_range') == 'this_month' ? 'selected' : '' }}>This Month</option>
+                            <option value="last_month" {{ request('date_range') == 'last_month' ? 'selected' : '' }}>Last Month</option>
+                            <option value="more" {{ request('date_range') == 'more' ? 'selected' : '' }}>Older than 14 Days</option>
+                        </select>
+                    </div>
                     <div class="col-md-2 col-6">
                         <label class="form-label small mb-1">Amount Min ($)</label>
                         <input type="number" name="amount_min" class="form-control form-control-modern form-control-sm" step="0.01" min="0" placeholder="0" value="{{ request('amount_min') }}">
@@ -198,39 +286,91 @@
                         <label class="form-label small mb-1">Amount Max ($)</label>
                         <input type="number" name="amount_max" class="form-control form-control-modern form-control-sm" step="0.01" min="0" placeholder="—" value="{{ request('amount_max') }}">
                     </div>
-                    <div class="col-md-2 col-6">
-                        <label class="form-label small mb-1">Min Booths</label>
-                        <input type="number" name="booth_count_min" class="form-control form-control-modern form-control-sm" min="1" placeholder="1" value="{{ request('booth_count_min') }}">
+                </div>
+            </div>
+
+            <!-- Filter Actions + Column Customization + Quick Chips -->
+            <div class="filter-actions d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <button type="submit" class="action-btn action-btn-primary books-filter-apply">
+                        <i class="fas fa-filter me-1"></i>Apply
+                    </button>
+                    <a href="{{ route('books.index') }}" class="action-btn action-btn-secondary books-filter-clear" id="booksFilterClearLink">
+                        <i class="fas fa-times me-1"></i>Clear all
+                    </a>
+
+                    <!-- Column Customization Dropdown -->
+                    <div class="dropdown books-col-dropdown d-inline-block">
+                        <button type="button" class="action-btn action-btn-secondary dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" id="booksColDropdownBtn">
+                            <i class="fas fa-columns me-1"></i>Columns
+                            <span class="badge bg-primary rounded-pill ms-1" id="booksColCountBadge">11/11</span>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-start shadow-lg p-3 books-col-menu" aria-labelledby="booksColDropdownBtn">
+                            <div class="d-flex align-items-center justify-content-between pb-2 mb-2 border-bottom">
+                                <span class="fw-bold small text-dark"><i class="fas fa-table-columns me-1 text-primary"></i>Columns</span>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none me-2 text-primary" onclick="toggleAllColumns(true)">All</button>
+                                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted" onclick="resetDefaultColumns()">Reset</button>
+                                </div>
+                            </div>
+                            <div class="books-col-list">
+                                @php
+                                    $allColumns = [
+                                        ['key' => 'rownum', 'label' => 'Row #', 'icon' => 'fas fa-list-ol'],
+                                        ['key' => 'id', 'label' => 'Booking ID', 'icon' => 'fas fa-hashtag'],
+                                        ['key' => 'client', 'label' => 'Client', 'icon' => 'fas fa-user-tie'],
+                                        ['key' => 'team', 'label' => 'Team Member', 'icon' => 'fas fa-users'],
+                                        ['key' => 'floorplan', 'label' => 'Floor Plan', 'icon' => 'fas fa-map'],
+                                        ['key' => 'date', 'label' => 'Date & Time', 'icon' => 'fas fa-calendar'],
+                                        ['key' => 'booths', 'label' => 'Booths', 'icon' => 'fas fa-cube'],
+                                        ['key' => 'type', 'label' => 'Type', 'icon' => 'fas fa-tag'],
+                                        ['key' => 'status', 'label' => 'Status', 'icon' => 'fas fa-circle-check'],
+                                        ['key' => 'amount', 'label' => 'Amount', 'icon' => 'fas fa-dollar-sign'],
+                                        ['key' => 'actions', 'label' => 'Actions', 'icon' => 'fas fa-ellipsis'],
+                                    ];
+                                @endphp
+                                @foreach($allColumns as $col)
+                                    <label class="books-col-item form-check d-flex align-items-center gap-2 mb-1 py-1 px-2 rounded">
+                                        <input class="form-check-input mt-0 books-col-cb" type="checkbox" value="{{ $col['key'] }}" data-col-key="{{ $col['key'] }}" checked onchange="toggleColumn('{{ $col['key'] }}', this.checked)">
+                                        <span class="form-check-label small user-select-none"><i class="{{ $col['icon'] }} text-muted me-1.5"></i>{{ $col['label'] }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                            <div class="pt-2 mt-2 border-top text-muted" style="font-size: 0.72rem;">
+                                <i class="fas fa-info-circle me-1"></i>Table always fits 100% width.
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-md-3 col-6">
-                        <label class="form-label small mb-1">Date Range Preset</label>
-                        <select name="date_range" class="form-control form-control-modern form-control-sm">
-                            <option value="all" {{ request('date_range', 'all') == 'all' ? 'selected' : '' }}>All Dates</option>
-                            <option value="today" {{ request('date_range') == 'today' ? 'selected' : '' }}>Today</option>
-                            <option value="3days" {{ request('date_range') == '3days' ? 'selected' : '' }}>Last 3 Days</option>
-                            <option value="7days" {{ request('date_range') == '7days' ? 'selected' : '' }}>Last 7 Days</option>
-                            <option value="14days" {{ request('date_range') == '14days' ? 'selected' : '' }}>Last 14 Days</option>
-                            <option value="more" {{ request('date_range') == 'more' ? 'selected' : '' }}>Older than 14 Days</option>
-                        </select>
+
+                    <div class="vr d-none d-sm-block my-1 mx-1 opacity-25"></div>
+
+                    <!-- Quick Filters: Date -->
+                    <div class="d-flex flex-wrap gap-1 align-items-center">
+                        <span class="text-muted small me-1">Date:</span>
+                        <button type="button" class="filter-chip {{ !request('date_from') && !request('date_to') && (!request('date_range') || request('date_range') == 'all') ? 'active' : '' }}" onclick="setQuickDate('')">All</button>
+                        <button type="button" class="filter-chip {{ request('date_range') == 'today' ? 'active' : '' }}" onclick="setQuickDate('today')">Today</button>
+                        <button type="button" class="filter-chip {{ request('date_range') == 'yesterday' ? 'active' : '' }}" onclick="setQuickDate('yesterday')">Yesterday</button>
+                        <button type="button" class="filter-chip {{ request('date_range') == 'this_week' ? 'active' : '' }}" onclick="setQuickDate('this_week')">This Week</button>
+                        <button type="button" class="filter-chip {{ request('date_range') == '7days' ? 'active' : '' }}" onclick="setQuickDate('7days')">Last 7d</button>
+                        <button type="button" class="filter-chip {{ request('date_range') == 'this_month' ? 'active' : '' }}" onclick="setQuickDate('this_month')">This Month</button>
+                    </div>
+
+                    <div class="vr d-none d-md-block my-1 mx-1 opacity-25"></div>
+
+                    <!-- Quick Filters: Payment Status -->
+                    <div class="d-flex flex-wrap gap-1 align-items-center">
+                        <span class="text-muted small me-1">Payment:</span>
+                        <button type="button" class="filter-chip {{ !request('payment_status') ? 'active' : '' }}" onclick="setQuickPayment('')">All</button>
+                        <button type="button" class="filter-chip {{ request('payment_status') == 'paid' ? 'active' : '' }}" onclick="setQuickPayment('paid')">Paid</button>
+                        <button type="button" class="filter-chip {{ request('payment_status') == 'partial' ? 'active' : '' }}" onclick="setQuickPayment('partial')">Partial</button>
+                        <button type="button" class="filter-chip {{ request('payment_status') == 'unpaid' ? 'active' : '' }}" onclick="setQuickPayment('unpaid')">Unpaid</button>
                     </div>
                 </div>
             </div>
 
-            <!-- Quick date presets (chips) -->
-            <div class="filter-actions">
-                <button type="submit" class="action-btn action-btn-primary books-filter-apply">
-                    <i class="fas fa-filter me-1"></i>Apply
-                </button>
-                <a href="{{ route('books.index') }}" class="action-btn action-btn-secondary books-filter-clear" id="booksFilterClearLink">
-                    <i class="fas fa-times me-1"></i>Clear all
-                </a>
-                <div class="d-flex flex-wrap gap-2 ms-2 align-items-center">
-                    <span class="text-muted small me-1">Quick:</span>
-                    <button type="button" class="filter-chip {{ !request('date_from') && !request('date_to') && (!request('date_range') || request('date_range') == 'all') ? 'active' : '' }}" onclick="setQuickDate('')">All</button>
-                    <button type="button" class="filter-chip {{ request('date_range') == 'today' ? 'active' : '' }}" onclick="setQuickDate('today')">Today</button>
-                    <button type="button" class="filter-chip {{ request('date_range') == '7days' ? 'active' : '' }}" onclick="setQuickDate('7days')">Last 7 Days</button>
-                    <button type="button" class="filter-chip" onclick="setQuickDate('30days')">Last 30 Days</button>
-                </div>
+            <!-- Removable Active Filter Pills Bar -->
+            <div id="booksActiveFiltersBar" class="books-active-filters-bar {{ $activeFilterCount > 0 ? '' : 'd-none' }}">
+                <!-- Rendered dynamically by renderActiveFilterPills() -->
             </div>
         </form>
     </div>
@@ -272,6 +412,47 @@
                             <button type="button" class="plastic-btn-press" onclick="setBooksCardDensity('small')" id="booksDensitySmall">Small</button>
                             <button type="button" class="active plastic-btn-press" onclick="setBooksCardDensity('medium')" id="booksDensityMedium">Medium</button>
                             <button type="button" class="plastic-btn-press" onclick="setBooksCardDensity('large')" id="booksDensityLarge">Large</button>
+                        </div>
+                    </div>
+
+                    <div class="booths-settings-block mt-3">
+                        <div class="booths-settings-block__head">
+                            <span class="booths-settings-block__icon booths-settings-block__icon--blue"><i class="fas fa-columns" aria-hidden="true"></i></span>
+                            <div class="d-flex align-items-center justify-content-between flex-grow-1 flex-wrap gap-2">
+                                <div>
+                                    <h6 class="booths-settings-block__title">Table Columns</h6>
+                                    <p class="booths-settings-block__desc mb-0">Choose which columns to show in <strong>Table</strong> view. Remaining columns expand dynamically to 100%.</p>
+                                </div>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-outline-primary btn-sm py-1 px-2" onclick="toggleAllColumns(true)">Show All</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm py-1 px-2" onclick="resetDefaultColumns()">Reset Default</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-2 mt-2" id="booksSettingsModalColumns">
+                            @php
+                                $modalColumns = [
+                                    ['key' => 'rownum', 'label' => 'Row #', 'icon' => 'fas fa-list-ol'],
+                                    ['key' => 'id', 'label' => 'Booking ID', 'icon' => 'fas fa-hashtag'],
+                                    ['key' => 'client', 'label' => 'Client', 'icon' => 'fas fa-user-tie'],
+                                    ['key' => 'team', 'label' => 'Team Member', 'icon' => 'fas fa-users'],
+                                    ['key' => 'floorplan', 'label' => 'Floor Plan', 'icon' => 'fas fa-map'],
+                                    ['key' => 'date', 'label' => 'Date & Time', 'icon' => 'fas fa-calendar'],
+                                    ['key' => 'booths', 'label' => 'Booths', 'icon' => 'fas fa-cube'],
+                                    ['key' => 'type', 'label' => 'Type', 'icon' => 'fas fa-tag'],
+                                    ['key' => 'status', 'label' => 'Status', 'icon' => 'fas fa-circle-check'],
+                                    ['key' => 'amount', 'label' => 'Amount', 'icon' => 'fas fa-dollar-sign'],
+                                    ['key' => 'actions', 'label' => 'Actions', 'icon' => 'fas fa-ellipsis'],
+                                ];
+                            @endphp
+                            @foreach($modalColumns as $mc)
+                            <div class="col-sm-4 col-6">
+                                <label class="books-col-item form-check d-flex align-items-center gap-2 p-2 border rounded mb-0 bg-white">
+                                    <input class="form-check-input mt-0 books-col-cb" type="checkbox" value="{{ $mc['key'] }}" data-col-key="{{ $mc['key'] }}" checked onchange="toggleColumn('{{ $mc['key'] }}', this.checked)">
+                                    <span class="form-check-label small user-select-none"><i class="{{ $mc['icon'] }} text-muted me-1"></i>{{ $mc['label'] }}</span>
+                                </label>
+                            </div>
+                            @endforeach
                         </div>
                     </div>
 
@@ -428,6 +609,300 @@
         lazyObserver.observe(trigger);
     }
 
+    // Column Customization Definitions & Dynamic Width Engine
+    const BOOK_COLUMNS = [
+        { key: 'rownum', label: 'Row #', icon: 'fas fa-list-ol', weight: 3.5 },
+        { key: 'id', label: 'Booking ID', icon: 'fas fa-hashtag', weight: 5.0 },
+        { key: 'client', label: 'Client', icon: 'fas fa-user-tie', weight: 18.0 },
+        { key: 'team', label: 'Team Member', icon: 'fas fa-users', weight: 8.5 },
+        { key: 'floorplan', label: 'Floor Plan', icon: 'fas fa-map', weight: 12.0 },
+        { key: 'date', label: 'Date & Time', icon: 'fas fa-calendar', weight: 11.0 },
+        { key: 'booths', label: 'Booths', icon: 'fas fa-cube', weight: 10.0 },
+        { key: 'type', label: 'Type', icon: 'fas fa-tag', weight: 8.0 },
+        { key: 'status', label: 'Status', icon: 'fas fa-circle-check', weight: 8.0 },
+        { key: 'amount', label: 'Amount', icon: 'fas fa-dollar-sign', weight: 8.5 },
+        { key: 'actions', label: 'Actions', icon: 'fas fa-ellipsis', weight: 7.5 }
+    ];
+    const COL_STORAGE_KEY = 'booksVisibleColumns_v1';
+
+    function getVisibleColumns() {
+        try {
+            const raw = localStorage.getItem(COL_STORAGE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (typeof parsed === 'object' && parsed !== null) {
+                    return parsed;
+                }
+            }
+        } catch (e) {}
+        const def = {};
+        BOOK_COLUMNS.forEach(function(c) { def[c.key] = true; });
+        return def;
+    }
+
+    function saveVisibleColumns(state) {
+        try {
+            localStorage.setItem(COL_STORAGE_KEY, JSON.stringify(state));
+        } catch (e) {}
+    }
+
+    function applyColumnVisibility() {
+        const visibleState = getVisibleColumns();
+        let totalWeight = 0;
+        let visibleCount = 0;
+
+        BOOK_COLUMNS.forEach(function(col) {
+            if (visibleState[col.key] !== false) {
+                totalWeight += col.weight;
+                visibleCount++;
+            }
+        });
+
+        if (visibleCount === 0) {
+            visibleState['client'] = true;
+            totalWeight = 18.0;
+            visibleCount = 1;
+            saveVisibleColumns(visibleState);
+        }
+
+        let css = '';
+        BOOK_COLUMNS.forEach(function(col) {
+            const isVis = (visibleState[col.key] !== false);
+            if (!isVis) {
+                css += '.books-page .books-looker-table .books-th-' + col.key + ', .books-page .books-looker-table .books-col-' + col.key + ' { display: none !important; }\n';
+            } else {
+                const pct = ((col.weight / totalWeight) * 100).toFixed(2);
+                css += '.books-page .books-looker-table .books-th-' + col.key + ', .books-page .books-looker-table .books-col-' + col.key + ' { width: ' + pct + '% !important; max-width: ' + pct + '% !important; min-width: 0 !important; }\n';
+            }
+        });
+
+        let styleEl = document.getElementById('booksDynamicColumnsStyle');
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = 'booksDynamicColumnsStyle';
+            document.head.appendChild(styleEl);
+        }
+        styleEl.textContent = css;
+
+        document.querySelectorAll('.books-col-cb').forEach(function(cb) {
+            const k = cb.dataset.colKey || cb.value;
+            cb.checked = (visibleState[k] !== false);
+        });
+
+        const badge = document.getElementById('booksColCountBadge');
+        if (badge) {
+            badge.textContent = visibleCount + '/' + BOOK_COLUMNS.length;
+            if (visibleCount < BOOK_COLUMNS.length) {
+                badge.classList.remove('bg-primary');
+                badge.classList.add('bg-warning', 'text-dark');
+            } else {
+                badge.classList.remove('bg-warning', 'text-dark');
+                badge.classList.add('bg-primary');
+            }
+        }
+    }
+
+    window.toggleColumn = function(key, isVisible) {
+        const state = getVisibleColumns();
+        let currentVis = 0;
+        BOOK_COLUMNS.forEach(function(c) {
+            if (state[c.key] !== false) currentVis++;
+        });
+
+        if (!isVisible && currentVis <= 1 && state[key] !== false) {
+            alert('At least one column must remain visible.');
+            applyColumnVisibility();
+            return;
+        }
+
+        state[key] = !!isVisible;
+        saveVisibleColumns(state);
+        applyColumnVisibility();
+    };
+
+    window.toggleAllColumns = function(showAll) {
+        const state = {};
+        BOOK_COLUMNS.forEach(function(c) {
+            state[c.key] = !!showAll;
+        });
+        if (!showAll) {
+            state['client'] = true;
+        }
+        saveVisibleColumns(state);
+        applyColumnVisibility();
+    };
+
+    window.resetDefaultColumns = function() {
+        try {
+            localStorage.removeItem(COL_STORAGE_KEY);
+        } catch (e) {}
+        applyColumnVisibility();
+    };
+
+    // Quick Payment status helper
+    window.setQuickPayment = function(status) {
+        const form = document.getElementById('filterForm');
+        if (!form) return;
+        const sel = form.querySelector('select[name="payment_status"]');
+        if (sel) {
+            sel.value = status;
+            applyFiltersAjax();
+        }
+    };
+
+    // Active Filter Pills Bar Rendering
+    function renderActiveFilterPills() {
+        const form = document.getElementById('filterForm');
+        const container = document.getElementById('booksActiveFiltersBar');
+        if (!form || !container) return;
+
+        const pills = [];
+
+        const searchVal = form.querySelector('input[name="search"]')?.value.trim();
+        if (searchVal) {
+            pills.push({ name: 'search', label: 'Search: "' + searchVal + '"' });
+        }
+
+        const userSelect = form.querySelector('select[name="user_id"]');
+        if (userSelect && userSelect.value) {
+            const optText = userSelect.options[userSelect.selectedIndex]?.text || userSelect.value;
+            pills.push({ name: 'user_id', label: 'Team: ' + optText.split('(')[0].trim() });
+        }
+
+        const statusSelect = form.querySelector('select[name="status"]');
+        if (statusSelect && statusSelect.value) {
+            const optText = statusSelect.options[statusSelect.selectedIndex]?.text || statusSelect.value;
+            pills.push({ name: 'status', label: 'Status: ' + optText });
+        }
+
+        const payStatusSelect = form.querySelector('select[name="payment_status"]');
+        if (payStatusSelect && payStatusSelect.value) {
+            const optText = payStatusSelect.options[payStatusSelect.selectedIndex]?.text || payStatusSelect.value;
+            pills.push({ name: 'payment_status', label: 'Payment: ' + optText.split('(')[0].trim() });
+        }
+
+        const fpSelect = form.querySelector('select[name="floor_plan_id"]');
+        if (fpSelect && fpSelect.value) {
+            const optText = fpSelect.options[fpSelect.selectedIndex]?.text || fpSelect.value;
+            pills.push({ name: 'floor_plan_id', label: 'Floor Plan: ' + optText });
+        }
+
+        const evSelect = form.querySelector('select[name="event_id"]');
+        if (evSelect && evSelect.value) {
+            const optText = evSelect.options[evSelect.selectedIndex]?.text || evSelect.value;
+            pills.push({ name: 'event_id', label: 'Event: ' + optText });
+        }
+
+        const typeSelect = form.querySelector('select[name="type"]');
+        if (typeSelect && typeSelect.value) {
+            const optText = typeSelect.options[typeSelect.selectedIndex]?.text || typeSelect.value;
+            pills.push({ name: 'type', label: 'Type: ' + optText });
+        }
+
+        const payMethodSelect = form.querySelector('select[name="payment_method"]');
+        if (payMethodSelect && payMethodSelect.value) {
+            const optText = payMethodSelect.options[payMethodSelect.selectedIndex]?.text || payMethodSelect.value;
+            pills.push({ name: 'payment_method', label: 'Method: ' + optText });
+        }
+
+        const boothNumVal = form.querySelector('input[name="booth_number"]')?.value.trim();
+        if (boothNumVal) {
+            pills.push({ name: 'booth_number', label: 'Booth: ' + boothNumVal });
+        }
+
+        const boothCountVal = form.querySelector('input[name="booth_count_min"]')?.value.trim();
+        if (boothCountVal && parseInt(boothCountVal, 10) > 1) {
+            pills.push({ name: 'booth_count_min', label: 'Min Booths: ' + boothCountVal });
+        }
+
+        const dateRangeSelect = form.querySelector('select[name="date_range"]');
+        if (dateRangeSelect && dateRangeSelect.value && dateRangeSelect.value !== 'all') {
+            const optText = dateRangeSelect.options[dateRangeSelect.selectedIndex]?.text || dateRangeSelect.value;
+            pills.push({ name: 'date_range', label: 'Date: ' + optText });
+        }
+
+        const dateFrom = form.querySelector('input[name="date_from"]')?.value;
+        const dateTo = form.querySelector('input[name="date_to"]')?.value;
+        if (dateFrom || dateTo) {
+            pills.push({ name: 'date_range_custom', label: 'Dates: ' + (dateFrom || 'Start') + ' → ' + (dateTo || 'End') });
+        }
+
+        const amtMin = form.querySelector('input[name="amount_min"]')?.value;
+        const amtMax = form.querySelector('input[name="amount_max"]')?.value;
+        if (amtMin || amtMax) {
+            pills.push({ name: 'amount_range', label: 'Amount: $' + (amtMin || '0') + ' - $' + (amtMax || '—') });
+        }
+
+        const sortBy = form.querySelector('select[name="sort_by"]')?.value;
+        if (sortBy && sortBy !== 'date_book') {
+            const optText = form.querySelector('select[name="sort_by"]').options[form.querySelector('select[name="sort_by"]').selectedIndex]?.text || sortBy;
+            const sortOrder = form.querySelector('select[name="sort_order"]')?.value || 'desc';
+            pills.push({ name: 'sort_by', label: 'Sort: ' + optText + ' (' + sortOrder.toUpperCase() + ')' });
+        }
+
+        if (pills.length === 0) {
+            container.innerHTML = '';
+            container.classList.add('d-none');
+            return;
+        }
+
+        container.classList.remove('d-none');
+        let html = '<span class="text-muted small me-1"><i class="fas fa-filter me-1"></i>Active filters:</span>';
+        pills.forEach(function(p) {
+            html += '<span class="books-filter-pill">' +
+                p.label +
+                '<button type="button" class="books-filter-pill-remove" onclick="removeFilterByName(\'' + p.name + '\')" title="Remove filter">✕</button>' +
+            '</span>';
+        });
+        html += '<button type="button" class="btn btn-link btn-sm p-0 ms-2 text-decoration-none text-danger small" onclick="clearAllFilters()">Clear all</button>';
+        container.innerHTML = html;
+    }
+
+    window.removeFilterByName = function(name) {
+        const form = document.getElementById('filterForm');
+        if (!form) return;
+        if (name === 'date_range_custom') {
+            if (form.elements['date_from']) form.elements['date_from'].value = '';
+            if (form.elements['date_to']) form.elements['date_to'].value = '';
+        } else if (name === 'amount_range') {
+            if (form.elements['amount_min']) form.elements['amount_min'].value = '';
+            if (form.elements['amount_max']) form.elements['amount_max'].value = '';
+        } else if (form.elements[name]) {
+            const el = form.elements[name];
+            if (el.tagName === 'SELECT') {
+                if (name === 'date_range') el.value = 'all';
+                else if (name === 'sort_by') el.value = 'date_book';
+                else if (name === 'sort_order') el.value = 'desc';
+                else if (name === 'group_by') el.value = 'none';
+                else el.selectedIndex = 0;
+            } else {
+                el.value = '';
+            }
+        }
+        applyFiltersAjax();
+    };
+
+    window.clearAllFilters = function() {
+        const form = document.getElementById('filterForm');
+        if (!form) return;
+        form.querySelectorAll('input, select').forEach(function(el) {
+            if (el.name === 'group_by') {
+                el.value = 'none';
+            } else if (el.name === 'date_range') {
+                el.value = 'all';
+            } else if (el.name === 'sort_by') {
+                el.value = 'date_book';
+            } else if (el.name === 'sort_order') {
+                el.value = 'desc';
+            } else if (el.type === 'text' || el.type === 'date' || el.type === 'number' || el.type === 'search') {
+                el.value = '';
+            } else if (el.tagName === 'SELECT' && el.name !== 'group_by') {
+                el.selectedIndex = 0;
+            }
+        });
+        applyFiltersAjax();
+    };
+
     function reinitBooksTableResize() {
         if (typeof window.initBooksTableColumnResize !== 'function') return;
         document.querySelectorAll('table.books-looker-table').forEach(function(table) {
@@ -477,6 +952,8 @@
                     window.setBooksCardDensity(d);
                 }
             } catch (e) {}
+            renderActiveFilterPills();
+            applyColumnVisibility();
             setupLazyLoadObserver();
             reinitBooksTableResize();
         })
@@ -492,12 +969,11 @@
             e.preventDefault();
             applyFiltersAjax();
         });
-    }
 
-    const groupBySelect = document.querySelector('select[name="group_by"]');
-    if (groupBySelect) {
-        groupBySelect.addEventListener('change', function() {
-            applyFiltersAjax();
+        filterForm.querySelectorAll('select').forEach(function(sel) {
+            sel.addEventListener('change', function() {
+                applyFiltersAjax();
+            });
         });
     }
 
@@ -505,23 +981,13 @@
     if (clearLink) {
         clearLink.addEventListener('click', function(e) {
             e.preventDefault();
-            const form = document.getElementById('filterForm');
-            if (!form) return;
-            form.querySelectorAll('input, select').forEach(function(el) {
-                if (el.name === 'group_by') {
-                    el.value = 'none';
-                } else if (el.name === 'date_range') {
-                    el.value = 'all';
-                } else if (el.type === 'text' || el.type === 'date' || el.type === 'number' || el.type === 'search') {
-                    el.value = '';
-                } else if (el.tagName === 'SELECT' && el.name !== 'group_by') {
-                    el.selectedIndex = 0;
-                }
-            });
-            applyFiltersAjax();
+            clearAllFilters();
         });
     }
 
+    // Initial setup on DOM ready
+    applyColumnVisibility();
+    renderActiveFilterPills();
     setupLazyLoadObserver();
     
     function loadMoreBookings() {
@@ -568,6 +1034,8 @@
                     if (cardView) {
                         cardView.insertAdjacentHTML('beforeend', data.html);
                     }
+                if (currentView === 'table') {
+                    applyColumnVisibility();
                 }
             }
             
