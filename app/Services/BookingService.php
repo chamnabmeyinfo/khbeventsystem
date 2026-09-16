@@ -6,6 +6,7 @@ use App\Helpers\ActivityLogger;
 use App\Models\Book;
 use App\Models\BookingTimeline;
 use App\Models\Booth;
+use App\Models\User;
 use App\Repositories\BookingRepository;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -194,6 +195,7 @@ class BookingService
 
         try {
             $oldStatus = $booking->status;
+            $oldUserId = $booking->userid;
 
             // If booth_ids are being updated
             if (isset($data['booth_ids'])) {
@@ -261,7 +263,7 @@ class BookingService
                         ->update([
                             'status' => Booth::STATUS_RESERVED,
                             'client_id' => $data['clientid'] ?? $booking->clientid,
-                            'userid' => $booking->userid,
+                            'userid' => $data['userid'] ?? $booking->userid,
                             'bookid' => $booking->id,
                         ]);
 
@@ -296,13 +298,31 @@ class BookingService
             $this->repository->update($booking, $data);
             $booking->refresh();
 
+            // Sync booth user ownership if userid was updated
+            if (isset($data['userid']) && ! empty($data['userid']) && (int) $data['userid'] !== (int) $oldUserId) {
+                $newUserId = (int) $data['userid'];
+                Booth::where('bookid', $booking->id)->update(['userid' => $newUserId]);
+
+                $oldUser = User::find($oldUserId);
+                $newUser = User::find($newUserId);
+                $oldName = $oldUser?->username ?? ($oldUserId ? 'User #'.$oldUserId : 'System');
+                $newName = $newUser?->username ?? 'User #'.$newUserId;
+
+                $this->createTimelineEntry(
+                    $booking,
+                    'reassigned',
+                    "Booking reassigned from {$oldName} to {$newName}"
+                );
+            }
+
             // Recalculate amounts after booth changes (if model has this method)
             if (method_exists($booking, 'updatePaymentAmounts')) {
                 $booking->updatePaymentAmounts();
             }
 
-            // Create timeline entry if status changed
+            // Sync booths status & timeline entry if status changed
             if (isset($data['status']) && $oldStatus != $data['status']) {
+                $this->syncBoothsStatusForBooking($booking, (int) $data['status']);
                 $this->createTimelineEntry($booking, 'status_changed', 'Status changed from '.$oldStatus.' to '.$data['status']);
             }
 
@@ -350,6 +370,9 @@ class BookingService
 
             $booking->refresh();
 
+            // Sync linked booths status
+            $this->syncBoothsStatusForBooking($booking, (int) $status);
+
             $this->createTimelineEntry($booking, 'status_changed', 'Status changed from '.$oldStatus.' to '.$status);
 
             $activity = null;
@@ -372,6 +395,108 @@ class BookingService
         } catch (\Exception $e) {
             DB::rollBack();
             throw $e;
+        }
+    }
+
+    /**
+     * Reassign booking and all linked booths to a new team member
+     */
+    public function reassignBooking(Book $booking, int $newUserId): Book
+    {
+        DB::beginTransaction();
+
+        try {
+            $oldUserId = $booking->userid;
+            $oldUser = User::find($oldUserId);
+            $newUser = User::findOrFail($newUserId);
+
+            $this->repository->update($booking, [
+                'userid' => $newUserId,
+            ]);
+
+            $booking->refresh();
+
+            // Update all linked booths for this booking
+            $boothIds = json_decode($booking->boothid, true) ?? [];
+            if (! empty($boothIds)) {
+                Booth::whereIn('id', $boothIds)
+                    ->where('bookid', $booking->id)
+                    ->update(['userid' => $newUserId]);
+            } else {
+                Booth::where('bookid', $booking->id)
+                    ->update(['userid' => $newUserId]);
+            }
+
+            $oldName = $oldUser?->username ?? ($oldUserId ? 'User #'.$oldUserId : 'System');
+            $newName = $newUser->username ?? 'User #'.$newUserId;
+
+            $this->createTimelineEntry(
+                $booking,
+                'reassigned',
+                "Booking reassigned from {$oldName} to {$newName}"
+            );
+
+            $activity = null;
+            try {
+                $activity = ActivityLogger::log(
+                    'booking.reassigned',
+                    $booking,
+                    "Booking #{$booking->id} reassigned to {$newName} (was {$oldName})"
+                );
+            } catch (\Exception $e) {
+                Log::error('Failed to log booking reassignment activity: '.$e->getMessage());
+            }
+
+            try {
+                NotificationService::notifyBookingAction('updated', $booking, $newUserId, $activity?->id);
+            } catch (\Exception $e) {
+                Log::error('Failed to send booking reassignment notification: '.$e->getMessage());
+            }
+
+            DB::commit();
+
+            $booking->load('user');
+
+            return $booking;
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Sync linked booth statuses with booking status
+     */
+    private function syncBoothsStatusForBooking(Book $booking, int $status): void
+    {
+        $boothIds = json_decode($booking->boothid, true) ?? [];
+        if (empty($boothIds)) {
+            return;
+        }
+
+        $booths = Booth::whereIn('id', $boothIds)->where('bookid', $booking->id)->get();
+        if ($booths->isEmpty()) {
+            return;
+        }
+
+        if ($status === Book::STATUS_PAID) {
+            Booth::whereIn('id', $booths->pluck('id'))->update(['status' => Booth::STATUS_PAID]);
+        } elseif ($status === Book::STATUS_CONFIRMED) {
+            Booth::whereIn('id', $booths->pluck('id'))->update(['status' => Booth::STATUS_CONFIRMED]);
+        } elseif ($status === Book::STATUS_RESERVED || $status === Book::STATUS_PENDING) {
+            Booth::whereIn('id', $booths->pluck('id'))->update(['status' => Booth::STATUS_RESERVED]);
+        } elseif ($status === Book::STATUS_CANCELLED) {
+            foreach ($booths as $booth) {
+                if ($booth->status !== Booth::STATUS_PAID) {
+                    $booth->update([
+                        'status' => Booth::STATUS_AVAILABLE,
+                        'client_id' => null,
+                        'userid' => null,
+                        'bookid' => null,
+                    ]);
+                }
+            }
         }
     }
 

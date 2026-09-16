@@ -172,6 +172,26 @@
                                 <small class="form-text text-muted">Current status of this booking</small>
                             </div>
                         </div>
+                        @if(auth()->user()->isAdmin() && isset($users) && $users->count() > 0)
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="userid" class="form-label">
+                                    <i class="fas fa-user-edit mr-1 text-primary"></i>Booked By (Team Member)
+                                    <span class="badge badge-primary ms-1" style="font-size: 10px;">Super Admin</span>
+                                </label>
+                                <select class="form-control @error('userid') is-invalid @enderror" id="userid" name="userid">
+                                    @foreach($users as $u)
+                                        <option value="{{ $u->id }}" {{ (string) old('userid', $book->userid) === (string) $u->id ? 'selected' : '' }}>
+                                            {{ $u->username }} ({{ $u->isAdmin() ? 'Admin' : ($u->role ? $u->role->name : 'Staff') }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('userid')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                                <small class="form-text text-muted">Reassign ownership of this booking and linked booths to another team member</small>
+                            </div>
+                        </div>
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label for="payment_due_date" class="form-label">Payment Due Date</label>
@@ -186,6 +206,22 @@
                                 <small class="form-text text-muted">When payment is due for this booking</small>
                             </div>
                         </div>
+                        @else
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="payment_due_date" class="form-label">Payment Due Date</label>
+                                <input type="date" 
+                                       class="form-control @error('payment_due_date') is-invalid @enderror" 
+                                       id="payment_due_date" 
+                                       name="payment_due_date" 
+                                       value="{{ old('payment_due_date', $book->payment_due_date ? $book->payment_due_date->format('Y-m-d') : '') }}">
+                                @error('payment_due_date')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                                <small class="form-text text-muted">When payment is due for this booking</small>
+                            </div>
+                        </div>
+                        @endif
                     </div>
                     <div class="row">
                         <div class="col-12">

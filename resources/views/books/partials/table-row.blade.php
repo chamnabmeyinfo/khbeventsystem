@@ -36,6 +36,9 @@
         @else
             <span class="text-muted">N/A</span>
         @endif
+        @if($book->user)
+            <br><small class="text-muted" title="Booked by"><i class="fas fa-user-tag me-1"></i>{{ $book->user->username }}</small>
+        @endif
     </td>
     <td>
         <span title="{{ $eventName ? 'Event: ' . $eventName : '' }}">{{ $floorPlanName }}</span>

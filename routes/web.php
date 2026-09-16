@@ -179,6 +179,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/books/upbooking', [BookController::class, 'upbooking'])->name('books.upbooking');
     Route::get('/books/info/{id}', [BookController::class, 'info'])->name('books.info');
     Route::post('/books/{book}/update-status', [BookController::class, 'updateStatus'])->name('books.update-status');
+    Route::post('/books/{book}/reassign-user', [BookController::class, 'updateBookedBy'])->name('books.reassign-user');
 
     // Categories
     Route::resource('categories', CategoryController::class);

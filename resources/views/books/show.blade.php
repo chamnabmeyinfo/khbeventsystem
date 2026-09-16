@@ -252,9 +252,21 @@
                             <small class="text-muted fw-normal">{{ $book->date_book->format('h:i A') }}</small>
                         </span>
                     </div>
-                    <div class="books-show-detail-row">
+                    <div class="books-show-detail-row align-items-center">
                         <span class="books-show-detail-label"><i class="fas fa-user me-2"></i>Booked by</span>
+                        @if(auth()->user()->isAdmin() && isset($users) && $users->count() > 0)
+                        <div class="books-show-detail-value" style="flex: 1; max-width: 220px;">
+                            <select id="bookedByUserSelect" class="form-select form-select-sm" data-original="{{ $book->userid }}" data-original-name="{{ $book->user->username ?? 'System' }}" title="Super Admin: Reassign booking owner">
+                                @foreach($users as $u)
+                                    <option value="{{ $u->id }}" {{ (string)$book->userid === (string)$u->id ? 'selected' : '' }}>
+                                        {{ $u->username }} ({{ $u->isAdmin() ? 'Admin' : ($u->role ? $u->role->name : 'Staff') }})
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @else
                         <span class="books-show-detail-value">{{ $book->user->username ?? 'System' }}</span>
+                        @endif
                     </div>
                     @if($book->floorPlan)
                     <div class="books-show-detail-row">
@@ -548,6 +560,59 @@ document.getElementById('bookingStatusSelect')?.addEventListener('change', funct
             });
         } else {
             this.value = '{{ $book->status ?? 1 }}';
+        }
+    });
+});
+
+document.getElementById('bookedByUserSelect')?.addEventListener('change', function() {
+    const newUserId = this.value;
+    const selectedOption = this.options[this.selectedIndex];
+    const newUsername = selectedOption.textContent.trim();
+    const originalUserId = this.getAttribute('data-original');
+
+    Swal.fire({
+        title: 'Reassign booking owner?',
+        text: `Reassign this booking and all its linked booths to ${newUsername}?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#007AFF',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, reassign',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch(`{{ route('books.reassign-user', $book->id) }}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ userid: newUserId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    this.setAttribute('data-original', newUserId);
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Owner Reassigned',
+                        text: data.message,
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                } else {
+                    this.value = originalUserId;
+                    Swal.fire('Error', data.message || 'Failed to reassign booking.', 'error');
+                }
+            })
+            .catch(error => {
+                this.value = originalUserId;
+                Swal.fire('Error', 'An error occurred while reassigning booking.', 'error');
+                console.error('Error:', error);
+            });
+        } else {
+            this.value = originalUserId;
         }
     });
 });

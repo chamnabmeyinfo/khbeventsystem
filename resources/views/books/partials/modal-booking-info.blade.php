@@ -18,6 +18,9 @@
         <strong>Date:</strong> {{ $book->date_book ? $book->date_book->format('F d, Y h:i A') : 'N/A' }}
     </div>
     <div class="mb-2">
+        <strong>Booked by:</strong> <i class="fas fa-user text-primary me-1"></i>{{ $book->user->username ?? 'System' }}
+    </div>
+    <div class="mb-2">
         <strong>Booths:</strong> {{ count($booths) }} {{ count($booths) == 1 ? 'Booth' : 'Booths' }}
         @if(count($booths) > 0)
         <br><small class="text-muted">{{ $booths->pluck('booth_number')->join(', ') }}</small>

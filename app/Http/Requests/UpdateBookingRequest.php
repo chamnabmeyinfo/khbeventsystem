@@ -21,6 +21,7 @@ class UpdateBookingRequest extends FormRequest
     {
         return [
             'clientid' => 'sometimes|required|exists:client,id',
+            'userid' => 'nullable|exists:user,id',
             'booth_ids' => 'sometimes|required|array|min:1',
             'booth_ids.*' => 'exists:booth,id',
             'date_book' => 'nullable|date',

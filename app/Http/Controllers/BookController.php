@@ -11,6 +11,7 @@ use App\Models\Category;
 use App\Models\Client;
 use App\Models\FloorPlan;
 use App\Models\Setting;
+use App\Models\User;
 use App\Services\BookingService;
 use App\Services\BookService;
 use Illuminate\Http\Request;
@@ -666,9 +667,18 @@ class BookController extends Controller
                     })->toArray(),
                 ],
             ]);
+            $users = auth()->check() && auth()->user()->isAdmin()
+                ? User::where('status', 1)->orderBy('username')->get()
+                : collect([]);
+
+            return view('books.show', compact('book', 'booths', 'payments', 'statusSettings', 'users'));
         }
 
-        return view('books.show', compact('book', 'booths', 'payments', 'statusSettings'));
+        $users = auth()->check() && auth()->user()->isAdmin()
+            ? User::where('status', 1)->orderBy('username')->get()
+            : collect([]);
+
+        return view('books.show', compact('book', 'booths', 'payments', 'statusSettings', 'users'));
     }
 
     /**
@@ -676,6 +686,13 @@ class BookController extends Controller
      */
     public function updateStatus(UpdateBookingStatusRequest $request, Book $book)
     {
+        if (! $this->canManageBooking($book)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to update this booking status.',
+            ], 403);
+        }
+
         try {
             $booking = $this->bookingService->updateBookingStatus(
                 $book,
@@ -700,6 +717,44 @@ class BookController extends Controller
     }
 
     /**
+     * Reassign booking ownership (Booked by who) to another team member
+     */
+    public function updateBookedBy(Request $request, Book $book)
+    {
+        if (! auth()->check() || ! auth()->user()->isAdmin()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only administrators can reassign booking ownership.',
+            ], 403);
+        }
+
+        $request->validate([
+            'userid' => 'required|integer|exists:user,id',
+        ]);
+
+        try {
+            $booking = $this->bookingService->reassignBooking($book, (int) $request->userid);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Booking owner reassigned successfully to ' . ($booking->user->username ?? 'User #' . $request->userid),
+                'user' => [
+                    'id' => $booking->user->id,
+                    'username' => $booking->user->username,
+                    'avatar' => $booking->user->avatar,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Booking reassignment failed: '.$e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to reassign booking: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Show the form for editing the specified booking
      */
     public function edit(Book $book)
@@ -714,8 +769,11 @@ class BookController extends Controller
         $clients = Client::orderBy('company')->get();
         $allBooths = Booth::orderBy('booth_number')->get();
         $categories = Category::where('status', 1)->orderBy('name')->get();
+        $users = auth()->check() && auth()->user()->isAdmin()
+            ? User::where('status', 1)->orderBy('username')->get()
+            : collect([]);
 
-        return view('books.edit', compact('book', 'clients', 'allBooths', 'currentBooths', 'boothIds', 'categories'));
+        return view('books.edit', compact('book', 'clients', 'allBooths', 'currentBooths', 'boothIds', 'categories', 'users'));
     }
 
     /**
@@ -729,6 +787,11 @@ class BookController extends Controller
 
         try {
             $validated = $request->validated();
+
+            // Only admins can reassign booking ownership
+            if ((! auth()->check() || ! auth()->user()->isAdmin()) && isset($validated['userid'])) {
+                unset($validated['userid']);
+            }
 
             // Auto-set date_book to current date/time if not provided
             if (empty($validated['date_book'])) {
