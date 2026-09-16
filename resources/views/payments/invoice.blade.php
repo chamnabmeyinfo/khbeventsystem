@@ -57,7 +57,15 @@
                     <div class="col-md-6">
                         <h6>Payment Details:</h6>
                         <p class="mb-0"><strong>Booking ID:</strong> #{{ $payment->booking_id }}</p>
-                        <p class="mb-0"><strong>Payment Method:</strong> {{ ucfirst(str_replace('_', ' ', $payment->payment_method)) }}</p>
+                        <p class="mb-0"><strong>Payment Method:</strong> 
+                            @if(method_exists($payment, 'isSplit') && $payment->isSplit())
+                                Split (Money + Product Barter)
+                            @elseif(method_exists($payment, 'isProductExchange') && $payment->isProductExchange())
+                                Product Exchange Barter
+                            @else
+                                {{ ucfirst(str_replace('_', ' ', $payment->payment_method)) }}
+                            @endif
+                        </p>
                         <p class="mb-0"><strong>Status:</strong> 
                             <span class="badge bg-{{ $payment->status == 'completed' ? 'success' : 'warning' }}">
                                 {{ ucfirst($payment->status) }}
@@ -70,18 +78,55 @@
                     <thead>
                         <tr>
                             <th>Description</th>
-                            <th class="text-end">Amount</th>
+                            <th class="text-end" style="width: 180px;">Amount</th>
                         </tr>
                     </thead>
                     <tbody>
+                        @if(method_exists($payment, 'isSplit') && $payment->isSplit())
+                        <tr>
+                            <td>
+                                <div><strong>Cash / Bank Transfer Portion</strong></div>
+                                <small class="text-muted">Settled via {{ ucfirst(str_replace('_', ' ', $payment->cash_payment_method ?? 'cash/transfer')) }}</small>
+                            </td>
+                            <td class="text-end">${{ number_format($payment->cash_amount ?? 0, 2) }}</td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div><strong>Product Exchange Deduction</strong></div>
+                                @if($payment->product_details)
+                                <small class="text-muted">Exchange items: {{ $payment->product_details }}</small>
+                                @endif
+                            </td>
+                            <td class="text-end">${{ number_format($payment->product_amount ?? 0, 2) }}</td>
+                        </tr>
+                        <tr class="table-light">
+                            <td><strong>Total Value Credited</strong></td>
+                            <td class="text-end"><strong>${{ number_format($payment->amount, 2) }}</strong></td>
+                        </tr>
+                        @elseif(method_exists($payment, 'isProductExchange') && $payment->isProductExchange())
+                        <tr>
+                            <td>
+                                <div><strong>Product Exchange Barter (100% Goods Deduction)</strong></div>
+                                @if($payment->product_details)
+                                <small class="text-muted">Exchange items: {{ $payment->product_details }}</small>
+                                @endif
+                            </td>
+                            <td class="text-end">${{ number_format($payment->amount, 2) }}</td>
+                        </tr>
+                        <tr class="table-light">
+                            <td><strong>Total Value Credited</strong></td>
+                            <td class="text-end"><strong>${{ number_format($payment->amount, 2) }}</strong></td>
+                        </tr>
+                        @else
                         <tr>
                             <td>Booth Booking Payment</td>
                             <td class="text-end">${{ number_format($payment->amount, 2) }}</td>
                         </tr>
-                        <tr>
+                        <tr class="table-light">
                             <td><strong>Total</strong></td>
                             <td class="text-end"><strong>${{ number_format($payment->amount, 2) }}</strong></td>
                         </tr>
+                        @endif
                     </tbody>
                 </table>
 

@@ -472,7 +472,27 @@
                     <tr>
                         <td>{{ $payment->paid_at->format('M d, Y h:i A') }}</td>
                         <td><strong class="books-amount-cell">${{ number_format($payment->amount, 2) }}</strong></td>
-                        <td><span class="status-badge status-badge-blue">{{ ucfirst(str_replace('_', ' ', $payment->payment_method)) }}</span></td>
+                        <td>
+                            @php
+                                $isSplit = method_exists($payment, 'isSplit') ? $payment->isSplit() : ($payment->payment_method === 'split');
+                                $isProdExchange = method_exists($payment, 'isProductExchange') ? $payment->isProductExchange() : ($payment->payment_method === 'product_exchange');
+                            @endphp
+                            @if($isSplit)
+                                <span class="status-badge status-badge-purple" title="Split payment">
+                                    <i class="fas fa-layer-group mr-1"></i> Split Payment
+                                </span>
+                                <div class="small text-muted mt-1" style="font-size: 0.75rem;">
+                                    <span class="text-success">${{ number_format($payment->cash_amount ?? 0, 2) }}</span> + 
+                                    <span class="text-info">${{ number_format($payment->product_amount ?? 0, 2) }} prod</span>
+                                </div>
+                            @elseif($isProdExchange)
+                                <span class="status-badge status-badge-indigo" title="Product exchange barter">
+                                    <i class="fas fa-boxes mr-1"></i> Product Exchange
+                                </span>
+                            @else
+                                <span class="status-badge status-badge-blue">{{ ucfirst(str_replace('_', ' ', $payment->payment_method)) }}</span>
+                            @endif
+                        </td>
                         <td>
                             @if($payment->status === 'completed')
                                 <span class="status-badge status-badge-green">{{ ucfirst($payment->status) }}</span>

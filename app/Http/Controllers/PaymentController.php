@@ -7,6 +7,7 @@ use App\Models\Booth;
 use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class PaymentController extends Controller
 {
@@ -59,6 +60,10 @@ class PaymentController extends Controller
         $stats = [
             'total_payments' => Payment::count(),
             'total_amount' => Payment::where('status', Payment::STATUS_COMPLETED)->sum('amount'),
+            'total_cash_amount' => Payment::where('status', Payment::STATUS_COMPLETED)
+                ->sum(DB::raw('COALESCE(cash_amount, CASE WHEN payment_method != "product_exchange" THEN amount ELSE 0 END)')),
+            'total_product_amount' => Payment::where('status', Payment::STATUS_COMPLETED)
+                ->sum(DB::raw('COALESCE(product_amount, CASE WHEN payment_method = "product_exchange" THEN amount ELSE 0 END)')),
             'pending_payments' => Payment::where('status', Payment::STATUS_PENDING)->count(),
             'failed_payments' => Payment::where('status', Payment::STATUS_FAILED)->count(),
             'today_payments' => Payment::whereDate('paid_at', today())->where('status', Payment::STATUS_COMPLETED)->sum('amount'),
@@ -70,6 +75,8 @@ class PaymentController extends Controller
 
         // Get unique payment methods
         $paymentMethods = Payment::distinct()->pluck('payment_method')->filter();
+        $knownMethods = collect(['cash', 'bank_transfer', 'online', 'check', 'product_exchange', 'split']);
+        $paymentMethods = $paymentMethods->concat($knownMethods)->unique()->values();
 
         // Get clients for filter
         $clients = \App\Models\Client::orderBy('company')->get();
@@ -82,12 +89,69 @@ class PaymentController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
-            'booking_id' => 'required|exists:book,id',
-            'amount' => 'required|numeric|min:0',
-            'payment_method' => 'required|in:cash,bank_transfer,online,check',
-            'notes' => 'nullable|string',
-        ]);
+        $structure = $request->input('payment_structure', 'standard');
+
+        if ($structure === 'split') {
+            $request->validate([
+                'booking_id' => 'required|exists:book,id',
+                'cash_amount' => 'required|numeric|min:0.01',
+                'cash_payment_method' => 'required|in:cash,bank_transfer,online,check',
+                'product_amount' => 'required|numeric|min:0.01',
+                'product_details' => 'required|string|max:2000',
+                'transaction_id' => 'nullable|string|max:100',
+                'notes' => 'nullable|string',
+            ]);
+
+            $cashAmount = round((float) $request->cash_amount, 2);
+            $productAmount = round((float) $request->product_amount, 2);
+            $totalAmount = round($cashAmount + $productAmount, 2);
+            $paymentMethod = Payment::METHOD_SPLIT;
+            $cashPaymentMethod = $request->cash_payment_method;
+            $productDetails = $request->product_details;
+        } elseif ($structure === 'product_exchange') {
+            $request->validate([
+                'booking_id' => 'required|exists:book,id',
+                'product_amount' => 'required|numeric|min:0.01',
+                'product_details' => 'required|string|max:2000',
+                'transaction_id' => 'nullable|string|max:100',
+                'notes' => 'nullable|string',
+            ]);
+
+            $cashAmount = 0.00;
+            $productAmount = round((float) $request->product_amount, 2);
+            $totalAmount = $productAmount;
+            $paymentMethod = Payment::METHOD_PRODUCT_EXCHANGE;
+            $cashPaymentMethod = null;
+            $productDetails = $request->product_details;
+        } else {
+            $request->validate([
+                'booking_id' => 'required|exists:book,id',
+                'amount' => 'required|numeric|min:0.01',
+                'payment_method' => 'required|in:cash,bank_transfer,online,check,product_exchange,split',
+                'transaction_id' => 'nullable|string|max:100',
+                'notes' => 'nullable|string',
+            ]);
+
+            $totalAmount = round((float) $request->amount, 2);
+            $paymentMethod = $request->payment_method;
+
+            if ($paymentMethod === Payment::METHOD_PRODUCT_EXCHANGE) {
+                $cashAmount = 0.00;
+                $productAmount = $totalAmount;
+                $cashPaymentMethod = null;
+                $productDetails = $request->product_details ?? 'Product exchange deduction';
+            } elseif ($paymentMethod === Payment::METHOD_SPLIT) {
+                $cashAmount = round((float) ($request->cash_amount ?? ($totalAmount / 2)), 2);
+                $productAmount = round($totalAmount - $cashAmount, 2);
+                $cashPaymentMethod = $request->cash_payment_method ?? 'bank_transfer';
+                $productDetails = $request->product_details ?? 'Product exchange deduction';
+            } else {
+                $cashAmount = $totalAmount;
+                $productAmount = 0.00;
+                $cashPaymentMethod = $paymentMethod;
+                $productDetails = null;
+            }
+        }
 
         $booking = Book::with(['client', 'statusSetting'])->findOrFail($request->booking_id);
 
@@ -104,13 +168,25 @@ class PaymentController extends Controller
             return back()->withErrors(['error' => 'You must be logged in to record a payment.'])->withInput();
         }
 
+        // Prepare combined notes with product exchange details for full transparency
+        $combinedNotes = $request->notes;
+        if (! empty($productDetails)) {
+            $itemSummary = '[Product Exchange: $' . number_format($productAmount, 2) . ' - ' . $productDetails . ']';
+            $combinedNotes = ! empty($combinedNotes) ? $combinedNotes . "\n" . $itemSummary : $itemSummary;
+        }
+
         $payment = Payment::create([
             'booking_id' => $request->booking_id,
             'client_id' => $booking->clientid,
-            'amount' => $request->amount,
-            'payment_method' => $request->payment_method,
+            'amount' => $totalAmount,
+            'cash_amount' => $cashAmount,
+            'product_amount' => $productAmount,
+            'product_details' => $productDetails,
+            'payment_method' => $paymentMethod,
+            'cash_payment_method' => $cashPaymentMethod,
+            'transaction_id' => $request->transaction_id,
             'status' => Payment::STATUS_COMPLETED,
-            'notes' => $request->notes,
+            'notes' => $combinedNotes,
             'paid_at' => now(),
             'user_id' => $userId,
         ]);
@@ -119,7 +195,7 @@ class PaymentController extends Controller
         $booking->updatePaymentAmounts();
 
         // Update booth payment amounts based on payment
-        // Distribute payment proportionally across booths
+        // Distribute payment proportionally across booths using total credited amount
         $boothIds = json_decode($booking->boothid, true) ?? [];
         if (! empty($boothIds)) {
             $booths = Booth::whereIn('id', $boothIds)->lockForUpdate()->get();
@@ -129,7 +205,7 @@ class PaymentController extends Controller
                 if ($totalBoothPrice > 0) {
                     // Calculate proportional payment for this booth
                     $boothProportion = ($booth->price / $totalBoothPrice);
-                    $boothPaymentAmount = $request->amount * $boothProportion;
+                    $boothPaymentAmount = $totalAmount * $boothProportion;
 
                     // Update booth payment amounts
                     $currentDepositPaid = (float) ($booth->deposit_paid ?? 0);

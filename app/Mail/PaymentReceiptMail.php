@@ -59,7 +59,12 @@ class PaymentReceiptMail extends Mailable
                 'receiptNumber' => $receiptNumber,
                 'paymentDate' => $this->payment->paid_at ?? $this->payment->created_at,
                 'amount' => $this->payment->amount,
-            'paymentMethod' => $this->getPaymentMethodLabel($this->payment->payment_method),
+                'paymentMethod' => $this->getPaymentMethodLabel($this->payment->payment_method),
+                'cashAmount' => $this->payment->cash_amount,
+                'productAmount' => $this->payment->product_amount,
+                'productDetails' => $this->payment->product_details,
+                'isSplit' => method_exists($this->payment, 'isSplit') ? $this->payment->isSplit() : ($this->payment->payment_method === 'split'),
+                'isProductExchange' => method_exists($this->payment, 'isProductExchange') ? $this->payment->isProductExchange() : ($this->payment->payment_method === 'product_exchange'),
                 'transactionId' => $this->payment->transaction_id,
             ],
         );
@@ -88,7 +93,9 @@ class PaymentReceiptMail extends Mailable
             'aba' => 'ABA Pay',
             'wing' => 'Wing',
             'paypal' => 'PayPal',
-            default => ucfirst($method ?? 'Other'),
+            'product_exchange' => 'Product Exchange',
+            'split' => 'Split (Money + Product Exchange)',
+            default => ucfirst(str_replace('_', ' ', $method ?? 'Other')),
         };
     }
 }

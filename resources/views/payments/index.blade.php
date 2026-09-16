@@ -58,10 +58,15 @@
             <div class="kpi-top">
                 <div class="kpi-title">Total revenue</div>
                 <div class="kpi-icon-wrapper primary-icon"><i class="fas fa-dollar-sign" aria-hidden="true"></i></div>
-            </div>
-            <div class="kpi-value-looker">${{ number_format($stats['total_amount'] ?? 0, 2) }}</div>
+            </di            <div class="kpi-value-looker">${{ number_format($stats['total_amount'] ?? 0, 2) }}</div>
             <div class="kpi-bottom trend-neutral">
-                <i class="fas fa-fw fa-circle" style="font-size: 6px;" aria-hidden="true"></i> Completed payments only
+                @if(isset($stats['total_product_amount']) && $stats['total_product_amount'] > 0)
+                    <span title="Cash: ${{ number_format($stats['total_cash_amount'] ?? 0, 2) }} | Product Barter: ${{ number_format($stats['total_product_amount'] ?? 0, 2) }}">
+                        <i class="fas fa-coins text-success"></i> ${{ number_format($stats['total_cash_amount'] ?? 0, 2) }} cash + <i class="fas fa-boxes text-info"></i> ${{ number_format($stats['total_product_amount'] ?? 0, 2) }} product
+                    </span>
+                @else
+                    <i class="fas fa-fw fa-circle" style="font-size: 6px;" aria-hidden="true"></i> Completed payments only
+                @endif
             </div>
         </div>
         <div class="kpi-card-looker success">
@@ -109,8 +114,8 @@
                     <div class="col-md-3 mb-3">
                         <label for="payments_search" class="form-label font-weight-bold">Search</label>
                         <input type="text" name="search" id="payments_search" class="form-control"
-                               placeholder="Transaction ID, amount, client…"
-                               value="{{ request('search') }}" autocomplete="off">
+                                placeholder="Transaction ID, amount, client…"
+                                value="{{ request('search') }}" autocomplete="off">
                     </div>
                     <div class="col-md-2 mb-3">
                         <label for="payments_status" class="form-label font-weight-bold">Status</label>
@@ -128,11 +133,17 @@
                             <option value="">All methods</option>
                             @foreach($paymentMethods ?? [] as $method)
                                 <option value="{{ $method }}" {{ request('payment_method') == $method ? 'selected' : '' }}>
-                                    {{ ucfirst(str_replace('_', ' ', $method)) }}
+                                    @if($method === 'split')
+                                        Split (Money + Product)
+                                    @elseif($method === 'product_exchange')
+                                        Product Exchange Barter
+                                    @else
+                                        {{ ucfirst(str_replace('_', ' ', $method)) }}
+                                    @endif
                                 </option>
                             @endforeach
                         </select>
-                    </div>
+                    </div></div>
                     <div class="col-md-2 mb-3">
                         <label for="payments_date_from" class="form-label font-weight-bold">Date from</label>
                         <input type="date" name="date_from" id="payments_date_from" class="form-control" value="{{ request('date_from') }}">
@@ -212,12 +223,39 @@
                         <td><span class="payments-amount-strong">${{ number_format($payment->amount, 2) }}</span></td>
                         <td>
                             @php
-                                $methodIcon = $payment->payment_method == 'cash' ? 'money-bill-wave' : ($payment->payment_method == 'bank_transfer' ? 'university' : ($payment->payment_method == 'online' ? 'credit-card' : 'file-invoice'));
+                                $method = $payment->payment_method;
+                                $isSplit = method_exists($payment, 'isSplit') ? $payment->isSplit() : ($method === 'split');
+                                $isProdExchange = method_exists($payment, 'isProductExchange') ? $payment->isProductExchange() : ($method === 'product_exchange');
+                                
+                                if ($isSplit) {
+                                    $badgeClass = 'status-badge-purple';
+                                    $methodIcon = 'layer-group';
+                                    $methodLabel = 'Split Payment';
+                                } elseif ($isProdExchange) {
+                                    $badgeClass = 'status-badge-indigo';
+                                    $methodIcon = 'boxes';
+                                    $methodLabel = 'Product Exchange';
+                                } else {
+                                    $badgeClass = 'status-badge-blue';
+                                    $methodIcon = $method == 'cash' ? 'money-bill-wave' : ($method == 'bank_transfer' ? 'university' : ($method == 'online' ? 'credit-card' : 'file-invoice'));
+                                    $methodLabel = ucfirst(str_replace('_', ' ', $method));
+                                }
                             @endphp
-                            <span class="status-badge status-badge-blue">
+                            <span class="status-badge {{ $badgeClass }}">
                                 <i class="fas fa-{{ $methodIcon }} mr-1" aria-hidden="true"></i>
-                                {{ ucfirst(str_replace('_', ' ', $payment->payment_method)) }}
+                                {{ $methodLabel }}
                             </span>
+                            @if($isSplit)
+                                <div class="small text-muted mt-1" style="font-size: 0.75rem; line-height: 1.2;">
+                                    <span class="text-success"><i class="fas fa-money-bill-wave"></i> ${{ number_format($payment->cash_amount ?? 0, 2) }}</span>
+                                    <span class="mx-1">+</span>
+                                    <span class="text-info" title="{{ $payment->product_details }}"><i class="fas fa-box-open"></i> ${{ number_format($payment->product_amount ?? 0, 2) }} prod</span>
+                                </div>
+                            @elseif($isProdExchange && $payment->product_details)
+                                <div class="small text-muted mt-1 text-truncate" style="font-size: 0.75rem; max-width: 150px;" title="{{ $payment->product_details }}">
+                                    <i class="fas fa-info-circle text-tertiary"></i> {{ $payment->product_details }}
+                                </div>
+                            @endif
                         </td>
                         <td>
                             @php

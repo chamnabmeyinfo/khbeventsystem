@@ -222,6 +222,45 @@
                 </div>
             </div>
             
+            <!-- Split / Product Exchange Details -->
+            @if(!empty($isSplit))
+            <div class="info-box" style="border-left-color: #6f42c1; background-color: #fcfaff;">
+                <h3 style="color: #6f42c1;">📦 Payment Method Breakdown</h3>
+                <div class="info-row">
+                    <span class="label">Cash / Bank Transfer Portion:</span>
+                    <span class="value"><strong style="color: #28a745;">${{ number_format($cashAmount ?? 0, 2) }}</strong></span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Product Exchange Deduction:</span>
+                    <span class="value"><strong style="color: #17a2b8;">${{ number_format($productAmount ?? 0, 2) }}</strong></span>
+                </div>
+                @if(!empty($productDetails))
+                <div class="info-row">
+                    <span class="label">Exchange Terms / Items:</span>
+                    <span class="value">{{ $productDetails }}</span>
+                </div>
+                @endif
+                <div class="info-row" style="border-top: 1px dashed #6f42c1; margin-top: 5px; padding-top: 10px;">
+                    <span class="label">Total Credited Value:</span>
+                    <span class="value"><strong>${{ number_format($amount, 2) }}</strong></span>
+                </div>
+            </div>
+            @elseif(!empty($isProductExchange))
+            <div class="info-box" style="border-left-color: #17a2b8; background-color: #f7fcfe;">
+                <h3 style="color: #17a2b8;">📦 Product Exchange Barter</h3>
+                <div class="info-row">
+                    <span class="label">Goods Credited Value:</span>
+                    <span class="value"><strong style="color: #17a2b8;">${{ number_format($amount, 2) }}</strong></span>
+                </div>
+                @if(!empty($productDetails))
+                <div class="info-row">
+                    <span class="label">Exchange Terms / Items:</span>
+                    <span class="value">{{ $productDetails }}</span>
+                </div>
+                @endif
+            </div>
+            @endif
+
             <!-- Booking Details -->
             @if($booking)
             <div class="info-box">
