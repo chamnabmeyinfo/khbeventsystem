@@ -219,6 +219,10 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/', [\App\Http\Controllers\PaymentController::class, 'index'])->name('index');
             Route::get('/create', [\App\Http\Controllers\PaymentController::class, 'create'])->name('create');
             Route::post('/', [\App\Http\Controllers\PaymentController::class, 'store'])->name('store');
+            Route::get('/{id}', [\App\Http\Controllers\PaymentController::class, 'show'])->name('show');
+            Route::get('/{id}/edit', [\App\Http\Controllers\PaymentController::class, 'edit'])->name('edit');
+            Route::put('/{id}', [\App\Http\Controllers\PaymentController::class, 'update'])->name('update');
+            Route::delete('/{id}', [\App\Http\Controllers\PaymentController::class, 'destroy'])->name('destroy');
             Route::get('/{id}/invoice', [\App\Http\Controllers\PaymentController::class, 'invoice'])->name('invoice');
             Route::post('/{id}/refund', [\App\Http\Controllers\PaymentController::class, 'refund'])->name('refund');
             Route::post('/{id}/void', [\App\Http\Controllers\PaymentController::class, 'void'])->name('void');

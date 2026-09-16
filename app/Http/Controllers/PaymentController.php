@@ -279,8 +279,275 @@ class PaymentController extends Controller
             // Don't fail the payment if email fails
         }
 
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Payment recorded successfully',
+                'payment' => $payment->fresh(['booking', 'client', 'user']),
+            ]);
+        }
+
+        if ($request->input('redirect_to') === 'booking' && $payment->booking_id) {
+            return redirect()->route('books.show', $payment->booking_id)
+                ->with('success', 'Payment recorded successfully');
+        }
+
         return redirect()->route('finance.payments.index')
             ->with('success', 'Payment recorded successfully');
+    }
+
+    /**
+     * Display the specified payment
+     */
+    public function show($id)
+    {
+        $payment = Payment::with(['booking', 'client', 'user'])->findOrFail($id);
+
+        if (request()->ajax() || request()->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'payment' => [
+                    'id' => $payment->id,
+                    'booking_id' => $payment->booking_id,
+                    'client_id' => $payment->client_id,
+                    'client_name' => $payment->client ? ($payment->client->company ?? $payment->client->name) : 'N/A',
+                    'amount' => (float) $payment->amount,
+                    'cash_amount' => (float) ($payment->cash_amount ?? 0),
+                    'product_amount' => (float) ($payment->product_amount ?? 0),
+                    'product_details' => $payment->product_details,
+                    'payment_method' => $payment->payment_method,
+                    'cash_payment_method' => $payment->cash_payment_method,
+                    'method_label' => $payment->method_label,
+                    'status' => $payment->status,
+                    'transaction_id' => $payment->transaction_id,
+                    'notes' => $payment->notes,
+                    'paid_at' => $payment->paid_at ? $payment->paid_at->format('Y-m-d\TH:i') : null,
+                    'paid_at_formatted' => $payment->paid_at ? $payment->paid_at->format('M d, Y h:i A') : 'N/A',
+                    'user' => $payment->user ? $payment->user->username : 'System',
+                    'is_split' => $payment->isSplit(),
+                    'is_product_exchange' => $payment->isProductExchange(),
+                ],
+            ]);
+        }
+
+        return redirect()->route('finance.payments.invoice', $payment->id);
+    }
+
+    /**
+     * Show the form for editing the specified payment
+     */
+    public function edit($id)
+    {
+        $payment = Payment::with(['booking', 'client', 'user'])->findOrFail($id);
+
+        if (request()->ajax() || request()->wantsJson()) {
+            return $this->show($id);
+        }
+
+        $booking = $payment->booking;
+        $client = $payment->client;
+
+        return view('payments.edit', compact('payment', 'booking', 'client'));
+    }
+
+    /**
+     * Update the specified payment in storage
+     */
+    public function update(Request $request, $id)
+    {
+        $payment = Payment::with('booking')->findOrFail($id);
+
+        $request->validate([
+            'payment_structure' => 'nullable|in:standard,split,product_exchange',
+            'amount' => 'nullable|numeric|min:0',
+            'cash_amount' => 'nullable|numeric|min:0',
+            'product_amount' => 'nullable|numeric|min:0',
+            'product_details' => 'nullable|string|max:1000',
+            'payment_method' => 'required|string',
+            'cash_payment_method' => 'nullable|string|max:50',
+            'status' => 'required|in:completed,pending,failed,refunded',
+            'paid_at' => 'nullable|date',
+            'transaction_id' => 'nullable|string|max:255',
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        try {
+            \DB::beginTransaction();
+
+            $structure = $request->input('payment_structure', 'standard');
+            $paidAt = $request->paid_at ? \Carbon\Carbon::parse($request->paid_at) : ($payment->paid_at ?? now());
+
+            if ($structure === 'split') {
+                $cashAmount = (float) $request->input('cash_amount', 0);
+                $productAmount = (float) $request->input('product_amount', 0);
+                $totalAmount = $cashAmount + $productAmount;
+                $paymentMethod = Payment::METHOD_SPLIT;
+                $cashPaymentMethod = $request->input('cash_payment_method') ?: ($request->input('payment_method') !== Payment::METHOD_SPLIT ? $request->input('payment_method') : 'cash');
+                $productDetails = $request->input('product_details');
+            } elseif ($structure === 'product_exchange') {
+                $cashAmount = 0.0;
+                $productAmount = (float) ($request->input('product_amount') ?: $request->input('amount', 0));
+                $totalAmount = $productAmount;
+                $paymentMethod = Payment::METHOD_PRODUCT_EXCHANGE;
+                $cashPaymentMethod = null;
+                $productDetails = $request->input('product_details');
+            } else {
+                $totalAmount = (float) ($request->input('amount') ?: $request->input('cash_amount', 0));
+                $cashAmount = $totalAmount;
+                $productAmount = 0.0;
+                $paymentMethod = $request->input('payment_method');
+                $cashPaymentMethod = $paymentMethod;
+                $productDetails = null;
+            }
+
+            if ($totalAmount <= 0) {
+                return back()->withInput()->with('error', 'Total payment amount must be greater than 0.');
+            }
+
+            $payment->update([
+                'amount' => $totalAmount,
+                'cash_amount' => $cashAmount,
+                'product_amount' => $productAmount,
+                'product_details' => $productDetails,
+                'payment_method' => $paymentMethod,
+                'cash_payment_method' => $cashPaymentMethod,
+                'status' => $request->input('status', Payment::STATUS_COMPLETED),
+                'paid_at' => $paidAt,
+                'transaction_id' => $request->input('transaction_id', $payment->transaction_id),
+                'notes' => $request->input('notes'),
+            ]);
+
+            // Sync booking and booth balances
+            if ($payment->booking) {
+                $this->syncBookingAndBooths($payment->booking);
+            }
+
+            \DB::commit();
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Payment #'.$payment->id.' updated successfully.',
+                    'payment' => $payment->fresh(['booking', 'client', 'user']),
+                    'booking' => $payment->booking ? $payment->booking->fresh() : null,
+                ]);
+            }
+
+            if ($request->input('redirect_to') === 'booking' && $payment->booking_id) {
+                return redirect()->route('books.show', $payment->booking_id)
+                    ->with('success', 'Payment updated successfully.');
+            }
+
+            return redirect()->back()->with('success', 'Payment updated successfully.');
+        } catch (\Exception $e) {
+            \DB::rollBack();
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error updating payment: '.$e->getMessage(),
+                ], 422);
+            }
+
+            return back()->withInput()->with('error', 'Error updating payment: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Remove the specified payment from storage
+     */
+    public function destroy(Request $request, $id)
+    {
+        $payment = Payment::with('booking')->findOrFail($id);
+
+        try {
+            \DB::beginTransaction();
+
+            $booking = $payment->booking;
+            $paymentId = $payment->id;
+            $amount = $payment->amount;
+
+            $payment->delete();
+
+            // Re-sync booking and booth balances
+            if ($booking) {
+                $this->syncBookingAndBooths($booking);
+            }
+
+            \DB::commit();
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Payment #'.$paymentId.' ($'.number_format($amount, 2).') deleted successfully.',
+                    'booking' => $booking ? $booking->fresh() : null,
+                ]);
+            }
+
+            if ($request->input('redirect_to') === 'booking' && $booking) {
+                return redirect()->route('books.show', $booking->id)
+                    ->with('success', 'Payment deleted successfully.');
+            }
+
+            return redirect()->back()->with('success', 'Payment deleted successfully.');
+        } catch (\Exception $e) {
+            \DB::rollBack();
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error deleting payment: '.$e->getMessage(),
+                ], 422);
+            }
+
+            return back()->with('error', 'Error deleting payment: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Re-sync booking total/paid/balance amounts and booth statuses
+     */
+    private function syncBookingAndBooths(Book $booking)
+    {
+        $booking->updatePaymentAmounts();
+
+        $boothIds = json_decode($booking->boothid, true) ?? [];
+        if (! empty($boothIds)) {
+            $booths = Booth::whereIn('id', $boothIds)->get();
+            $totalBookingPaid = (float) $booking->paid_amount;
+            $totalBookingPrice = (float) ($booking->total_amount > 0 ? $booking->total_amount : $booths->sum('price'));
+            $isFullyPaid = ($totalBookingPaid >= $totalBookingPrice && $totalBookingPrice > 0);
+
+            $remainingPool = $totalBookingPaid;
+
+            foreach ($booths as $booth) {
+                $boothPrice = (float) $booth->price;
+                if ($isFullyPaid) {
+                    $booth->deposit_paid = $boothPrice;
+                    $booth->balance_paid = 0;
+                    $booth->status = Booth::STATUS_PAID;
+                } elseif ($remainingPool > 0) {
+                    $boothShare = min($remainingPool, $boothPrice);
+                    $remainingPool -= $boothShare;
+                    $booth->deposit_paid = $boothShare;
+                    $booth->balance_paid = 0;
+                    if ($boothShare >= $boothPrice && $boothPrice > 0) {
+                        $booth->status = Booth::STATUS_PAID;
+                    } else {
+                        if ($booth->status === Booth::STATUS_AVAILABLE || $booth->status === Booth::STATUS_PAID) {
+                            $booth->status = Booth::STATUS_CONFIRMED;
+                        }
+                    }
+                } else {
+                    $booth->deposit_paid = 0;
+                    $booth->balance_paid = 0;
+                    if ($booth->status === Booth::STATUS_PAID) {
+                        $booth->status = Booth::STATUS_CONFIRMED;
+                    }
+                }
+                $booth->save();
+            }
+        }
     }
 
     /**
@@ -328,19 +595,19 @@ class PaymentController extends Controller
             $userId = $user ? (int) $user->id : null;
 
             if (! $userId) {
-                \DB::rollBack();
-
-                return back()->withErrors(['error' => 'You must be logged in to process a refund.']);
+                return back()->with('error', 'Authentication required to process refund.');
             }
 
-            // Create refund payment entry (negative amount)
+            // Create refund payment record
             $refundPayment = Payment::create([
                 'booking_id' => $payment->booking_id,
                 'client_id' => $payment->client_id,
-                'amount' => -$payment->amount, // Negative amount for refund
+                'amount' => -$payment->amount,
+                'cash_amount' => -$payment->cash_amount,
+                'product_amount' => -$payment->product_amount,
                 'payment_method' => $payment->payment_method,
-                'status' => Payment::STATUS_REFUNDED,
-                'transaction_id' => 'REFUND-'.$payment->transaction_id ?? 'REFUND-'.$payment->id,
+                'status' => Payment::STATUS_COMPLETED,
+                'transaction_id' => $request->transaction_id ? 'REFUND-'.$request->transaction_id : 'REFUND-'.$payment->id.'-'.time(),
                 'notes' => 'Refund for Payment #'.$payment->id.($request->notes ? ': '.$request->notes : ''),
                 'paid_at' => now(),
                 'user_id' => $userId,
@@ -352,21 +619,17 @@ class PaymentController extends Controller
                 'notes' => ($payment->notes ? $payment->notes.' | ' : '').'Refunded on '.now()->format('Y-m-d H:i:s'),
             ]);
 
-            // Revert booth status from paid to confirmed (or reserved if no confirmation)
-            // Use lock to prevent race conditions
+            // Re-sync booking and booth balances
             if ($payment->booking) {
-                $boothIds = json_decode($payment->booking->boothid, true) ?? [];
-                if (! empty($boothIds)) {
-                    Booth::whereIn('id', $boothIds)
-                        ->where('status', Booth::STATUS_PAID)
-                        ->lockForUpdate()
-                        ->update([
-                            'status' => Booth::STATUS_CONFIRMED, // Revert to confirmed, not available
-                        ]);
-                }
+                $this->syncBookingAndBooths($payment->booking);
             }
 
             \DB::commit();
+
+            if ($request->input('redirect_to') === 'booking' && $payment->booking_id) {
+                return redirect()->route('books.show', $payment->booking_id)
+                    ->with('success', 'Payment refunded successfully. Refund payment #'.$refundPayment->id.' created.');
+            }
 
             return redirect()->route('finance.payments.index')
                 ->with('success', 'Payment refunded successfully. Refund payment #'.$refundPayment->id.' created.');
@@ -396,29 +659,23 @@ class PaymentController extends Controller
         try {
             \DB::beginTransaction();
 
-            // Store original status before update
-            $originalStatus = $payment->status;
-
             // Update payment status to failed (voided)
             $payment->update([
                 'status' => Payment::STATUS_FAILED,
                 'notes' => ($payment->notes ? $payment->notes.' | ' : '').'VOIDED on '.now()->format('Y-m-d H:i:s').($request->notes ? ': '.$request->notes : ''),
             ]);
 
-            // Revert booth status if payment was completed (use lock to prevent race conditions)
-            if ($originalStatus === Payment::STATUS_COMPLETED && $payment->booking) {
-                $boothIds = json_decode($payment->booking->boothid, true) ?? [];
-                if (! empty($boothIds)) {
-                    Booth::whereIn('id', $boothIds)
-                        ->where('status', Booth::STATUS_PAID)
-                        ->lockForUpdate()
-                        ->update([
-                            'status' => Booth::STATUS_CONFIRMED, // Revert to confirmed
-                        ]);
-                }
+            // Re-sync booking and booth balances
+            if ($payment->booking) {
+                $this->syncBookingAndBooths($payment->booking);
             }
 
             \DB::commit();
+
+            if ($request->input('redirect_to') === 'booking' && $payment->booking_id) {
+                return redirect()->route('books.show', $payment->booking_id)
+                    ->with('success', 'Payment voided successfully.');
+            }
 
             return redirect()->route('finance.payments.index')
                 ->with('success', 'Payment voided successfully.');

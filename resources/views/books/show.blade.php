@@ -153,6 +153,47 @@
             width: 100%;
         }
     }
+    .hr-table-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-wrap: nowrap;
+    }
+    .action-btn-icon {
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        font-size: 0.82rem;
+    }
+    .payment-structure-card-modal {
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        padding: 10px 12px;
+        cursor: pointer;
+        transition: all 0.18s ease;
+        background: #fff;
+        height: 100%;
+    }
+    .payment-structure-card-modal:hover {
+        border-color: #b0c4de;
+    }
+    .payment-structure-card-modal.active {
+        border-color: #007bff;
+        background: #f0f7ff;
+    }
+    .payment-structure-card-modal .custom-control {
+        pointer-events: none;
+    }
+    .calc-modal-box {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 12px 15px;
+    }
 </style>
 @endpush
 
@@ -417,9 +458,14 @@
     <div class="canvas-panel books-show-panel">
         <div class="panel-header">
             <h2 class="panel-title"><i class="fas fa-money-bill-wave"></i> Payments</h2>
-            <a href="{{ route('finance.payments.create', ['booking_id' => $book->id]) }}" class="action-btn action-btn-primary plastic-btn-press">
-                <i class="fas fa-plus"></i> Record payment
-            </a>
+            <div class="d-flex align-items-center">
+                <button type="button" class="action-btn action-btn-primary plastic-btn-press mr-2" data-toggle="modal" data-target="#recordPaymentModal">
+                    <i class="fas fa-plus"></i> Record payment
+                </button>
+                <a href="{{ route('finance.payments.create', ['booking_id' => $book->id, 'redirect_to' => 'booking']) }}" class="action-btn action-btn-secondary" title="Full payment form">
+                    <i class="fas fa-external-link-alt"></i> Full form
+                </a>
+            </div>
         </div>
 
         <div class="kpi-wrapper books-show-payment-kpis">
@@ -465,11 +511,12 @@
                         <th>Status</th>
                         <th>Recorded by</th>
                         <th>Notes</th>
+                        <th style="min-width: 150px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($payments as $payment)
-                    <tr>
+                    <tr id="payment-row-{{ $payment->id }}">
                         <td>{{ $payment->paid_at->format('M d, Y h:i A') }}</td>
                         <td><strong class="books-amount-cell">${{ number_format($payment->amount, 2) }}</strong></td>
                         <td>
@@ -504,6 +551,45 @@
                         </td>
                         <td>{{ $payment->user->username ?? 'System' }}</td>
                         <td>{{ Str::limit($payment->notes ?? '—', 80) }}</td>
+                        <td>
+                            <div class="hr-table-actions">
+                                <button type="button" class="action-btn action-btn-secondary action-btn-icon"
+                                        onclick="viewPaymentDetails({{ json_encode($payment) }}, '{{ addslashes($payment->user->username ?? 'System') }}')"
+                                        title="View payment receipt details">
+                                    <i class="fas fa-eye" aria-hidden="true"></i>
+                                </button>
+                                <a href="{{ route('finance.payments.invoice', $payment->id) }}"
+                                   class="action-btn action-btn-secondary action-btn-icon"
+                                   target="_blank" rel="noopener noreferrer"
+                                   title="Print invoice">
+                                    <i class="fas fa-file-invoice" aria-hidden="true"></i>
+                                </a>
+                                <button type="button" class="action-btn action-btn-secondary action-btn-icon"
+                                        onclick="openEditPaymentModal({{ json_encode($payment) }})"
+                                        title="Edit payment">
+                                    <i class="fas fa-edit" aria-hidden="true"></i>
+                                </button>
+                                @if($payment->status === \App\Models\Payment::STATUS_COMPLETED)
+                                <button type="button" class="action-btn action-btn-secondary action-btn-icon"
+                                        onclick="refundBookingPayment({{ $payment->id }}, '{{ number_format($payment->amount, 2) }}')"
+                                        title="Refund payment">
+                                    <i class="fas fa-undo" aria-hidden="true"></i>
+                                </button>
+                                @endif
+                                @if(in_array($payment->status, [\App\Models\Payment::STATUS_COMPLETED, \App\Models\Payment::STATUS_PENDING]))
+                                <button type="button" class="action-btn action-btn-secondary action-btn-icon"
+                                        onclick="voidBookingPayment({{ $payment->id }})"
+                                        title="Void payment">
+                                    <i class="fas fa-ban" aria-hidden="true"></i>
+                                </button>
+                                @endif
+                                <button type="button" class="action-btn action-btn-danger-soft action-btn-icon"
+                                        onclick="deleteBookingPayment({{ $payment->id }}, '{{ number_format($payment->amount, 2) }}')"
+                                        title="Delete payment">
+                                    <i class="fas fa-trash-alt" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        </td>
                     </tr>
                     @endforeach
                 </tbody>
@@ -513,11 +599,419 @@
         <div class="text-center text-muted py-5">
             <i class="fas fa-money-bill-wave fa-3x mb-3 opacity-50"></i>
             <p class="mb-3">No payments recorded yet.</p>
-            <a href="{{ route('finance.payments.create', ['booking_id' => $book->id]) }}" class="action-btn action-btn-primary plastic-btn-press">
+            <button type="button" class="action-btn action-btn-primary plastic-btn-press mr-2" data-toggle="modal" data-target="#recordPaymentModal">
                 <i class="fas fa-plus"></i> Record first payment
+            </button>
+            <a href="{{ route('finance.payments.create', ['booking_id' => $book->id, 'redirect_to' => 'booking']) }}" class="action-btn action-btn-secondary">
+                <i class="fas fa-external-link-alt"></i> Full form
             </a>
         </div>
         @endif
+    </div>
+</div>
+
+<!-- Modal 1: Quick Record Payment Modal -->
+<div class="modal fade" id="recordPaymentModal" tabindex="-1" role="dialog" aria-labelledby="recordPaymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content shadow-lg border-0">
+            <form action="{{ route('finance.payments.store') }}" method="POST" id="bookingQuickPaymentForm">
+                @csrf
+                <input type="hidden" name="booking_id" value="{{ $book->id }}">
+                <input type="hidden" name="client_id" value="{{ $book->client_id }}">
+                <input type="hidden" name="redirect_to" value="booking">
+
+                <div class="modal-header bg-white border-bottom">
+                    <h5 class="modal-title font-weight-bold" id="recordPaymentModalLabel">
+                        <i class="fas fa-money-bill-wave text-primary mr-2"></i>Record Payment for Booking #{{ $book->id }}
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body p-4">
+                    <!-- Structure selector -->
+                    <div class="form-group mb-4">
+                        <label class="font-weight-bold small text-uppercase text-muted">Payment Structure <span class="text-danger">*</span></label>
+                        <div class="row">
+                            <div class="col-md-4 mb-2 mb-md-0">
+                                <div class="payment-structure-card-modal active" id="modalRecCardStandard" onclick="setQuickRecordStructure('standard')">
+                                    <div class="custom-control custom-radio">
+                                        <input type="radio" id="modal_rec_standard" name="payment_structure" value="standard" class="custom-control-input" checked>
+                                        <label class="custom-control-label font-weight-bold" for="modal_rec_standard">
+                                            <i class="fas fa-money-bill-wave text-success mr-1"></i>Standard Money
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">100% Cash / Bank / Online</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-2 mb-md-0">
+                                <div class="payment-structure-card-modal" id="modalRecCardSplit" onclick="setQuickRecordStructure('split')">
+                                    <div class="custom-control custom-radio">
+                                        <input type="radio" id="modal_rec_split" name="payment_structure" value="split" class="custom-control-input">
+                                        <label class="custom-control-label font-weight-bold" for="modal_rec_split">
+                                            <i class="fas fa-layer-group text-primary mr-1"></i>Split Payment
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">Money + Product Barter</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="payment-structure-card-modal" id="modalRecCardProduct" onclick="setQuickRecordStructure('product_exchange')">
+                                    <div class="custom-control custom-radio">
+                                        <input type="radio" id="modal_rec_product" name="payment_structure" value="product_exchange" class="custom-control-input">
+                                        <label class="custom-control-label font-weight-bold" for="modal_rec_product">
+                                            <i class="fas fa-boxes text-info mr-1"></i>Product Exchange
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">100% Goods Deduction</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Amounts input -->
+                    <div class="row">
+                        <div class="col-md-6" id="modalRecWrapperStandard">
+                            <div class="form-group mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label for="modal_rec_amount" class="font-weight-bold mb-0">Total Amount ($) <span class="text-danger">*</span></label>
+                                    <button type="button" class="btn btn-xs btn-outline-primary" onclick="quickFillRecBalance()">
+                                        Fill Balance (${{ number_format($book->balance_amount > 0 ? $book->balance_amount : ($book->total_amount ?? 0), 2) }})
+                                    </button>
+                                </div>
+                                <div class="input-group">
+                                    <div class="input-group-prepend"><span class="input-group-text font-weight-bold">$</span></div>
+                                    <input type="number" step="0.01" min="0.01" name="amount" id="modal_rec_amount" 
+                                           class="form-control form-control-lg font-weight-bold" 
+                                           value="{{ $book->balance_amount > 0 ? $book->balance_amount : ($book->total_amount ?? '') }}" 
+                                           oninput="updateQuickRecCalc()" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6" id="modalRecWrapperCash" style="display: none;">
+                            <div class="form-group mb-3">
+                                <label for="modal_rec_cash_amount" class="font-weight-bold text-success">
+                                    <i class="fas fa-coins mr-1"></i>Cash / Transfer Portion ($) <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend"><span class="input-group-text text-success font-weight-bold">$</span></div>
+                                    <input type="number" step="0.01" min="0" name="cash_amount" id="modal_rec_cash_amount" 
+                                           class="form-control form-control-lg font-weight-bold" placeholder="0.00" oninput="updateQuickRecCalc()">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6" id="modalRecWrapperProduct" style="display: none;">
+                            <div class="form-group mb-3">
+                                <label for="modal_rec_product_amount" class="font-weight-bold text-info">
+                                    <i class="fas fa-box-open mr-1"></i>Product Exchange Deduction ($) <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend"><span class="input-group-text text-info font-weight-bold">$</span></div>
+                                    <input type="number" step="0.01" min="0" name="product_amount" id="modal_rec_product_amount" 
+                                           class="form-control form-control-lg font-weight-bold" placeholder="0.00" oninput="updateQuickRecCalc()">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6" id="modalRecWrapperMethod">
+                            <div class="form-group mb-3">
+                                <label for="modal_rec_method" class="font-weight-bold" id="modalRecLblMethod">Payment Method <span class="text-danger">*</span></label>
+                                <select name="payment_method" id="modal_rec_method" class="form-control form-control-lg" required>
+                                    <option value="cash">Cash</option>
+                                    <option value="bank_transfer">Bank Transfer</option>
+                                    <option value="online">Online Payment</option>
+                                    <option value="check">Check</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Product Terms -->
+                    <div class="form-group mb-3" id="modalRecWrapperProductDetails" style="display: none;">
+                        <label for="modal_rec_product_details" class="font-weight-bold text-info">
+                            <i class="fas fa-clipboard-list mr-1"></i>Product Barter Items & Description
+                        </label>
+                        <textarea name="product_details" id="modal_rec_product_details" rows="2" 
+                                  class="form-control" placeholder="Describe goods received for barter deduction..."></textarea>
+                    </div>
+
+                    <!-- Calculation Box -->
+                    <div class="calc-modal-box mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted font-weight-bold">Total Credited Value:</span>
+                            <span class="font-weight-bold text-primary" id="modalRecTotalCredited" style="font-size: 1.25rem;">
+                                ${{ number_format($book->balance_amount > 0 ? $book->balance_amount : ($book->total_amount ?? 0), 2) }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Date & Notes -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label for="modal_rec_paid_at" class="font-weight-bold">Payment Date</label>
+                                <input type="datetime-local" name="paid_at" id="modal_rec_paid_at" class="form-control" value="{{ now()->format('Y-m-d\TH:i') }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label for="modal_rec_transaction_id">Transaction / Reference ID</label>
+                                <input type="text" name="transaction_id" id="modal_rec_transaction_id" class="form-control" placeholder="Optional reference #">
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="form-group mb-0">
+                                <label for="modal_rec_notes">Notes</label>
+                                <textarea name="notes" id="modal_rec_notes" class="form-control" rows="1" placeholder="Optional notes..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary font-weight-bold px-4">
+                        <i class="fas fa-save mr-1"></i>Record Payment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 2: Edit Payment Modal -->
+<div class="modal fade" id="editPaymentModal" tabindex="-1" role="dialog" aria-labelledby="editPaymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content shadow-lg border-0">
+            <form action="" method="POST" id="editPaymentModalForm">
+                @csrf
+                @method('PUT')
+                <input type="hidden" name="redirect_to" value="booking">
+
+                <div class="modal-header bg-white border-bottom">
+                    <h5 class="modal-title font-weight-bold" id="editPaymentModalLabel">
+                        <i class="fas fa-edit text-primary mr-2"></i>Edit Payment #<span id="editModalPaymentIdText"></span>
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body p-4">
+                    <!-- Structure selector -->
+                    <div class="form-group mb-4">
+                        <label class="font-weight-bold small text-uppercase text-muted">Payment Structure <span class="text-danger">*</span></label>
+                        <div class="row">
+                            <div class="col-md-4 mb-2 mb-md-0">
+                                <div class="payment-structure-card-modal active" id="modalEditCardStandard" onclick="setEditStructure('standard')">
+                                    <div class="custom-control custom-radio">
+                                        <input type="radio" id="modal_edit_standard" name="payment_structure" value="standard" class="custom-control-input" checked>
+                                        <label class="custom-control-label font-weight-bold" for="modal_edit_standard">
+                                            <i class="fas fa-money-bill-wave text-success mr-1"></i>Standard Money
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">100% Cash / Bank / Online</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-2 mb-md-0">
+                                <div class="payment-structure-card-modal" id="modalEditCardSplit" onclick="setEditStructure('split')">
+                                    <div class="custom-control custom-radio">
+                                        <input type="radio" id="modal_edit_split" name="payment_structure" value="split" class="custom-control-input">
+                                        <label class="custom-control-label font-weight-bold" for="modal_edit_split">
+                                            <i class="fas fa-layer-group text-primary mr-1"></i>Split Payment
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">Money + Product Barter</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="payment-structure-card-modal" id="modalEditCardProduct" onclick="setEditStructure('product_exchange')">
+                                    <div class="custom-control custom-radio">
+                                        <input type="radio" id="modal_edit_product" name="payment_structure" value="product_exchange" class="custom-control-input">
+                                        <label class="custom-control-label font-weight-bold" for="modal_edit_product">
+                                            <i class="fas fa-boxes text-info mr-1"></i>Product Exchange
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">100% Goods Deduction</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Amounts input -->
+                    <div class="row">
+                        <div class="col-md-6" id="modalEditWrapperStandard">
+                            <div class="form-group mb-3">
+                                <label for="modal_edit_amount" class="font-weight-bold">Total Payment Amount ($) <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend"><span class="input-group-text font-weight-bold">$</span></div>
+                                    <input type="number" step="0.01" min="0.01" name="amount" id="modal_edit_amount" 
+                                           class="form-control form-control-lg font-weight-bold" oninput="updateEditCalc()">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6" id="modalEditWrapperCash" style="display: none;">
+                            <div class="form-group mb-3">
+                                <label for="modal_edit_cash_amount" class="font-weight-bold text-success">
+                                    <i class="fas fa-coins mr-1"></i>Cash / Transfer Portion ($) <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend"><span class="input-group-text text-success font-weight-bold">$</span></div>
+                                    <input type="number" step="0.01" min="0" name="cash_amount" id="modal_edit_cash_amount" 
+                                           class="form-control form-control-lg font-weight-bold" oninput="updateEditCalc()">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6" id="modalEditWrapperProduct" style="display: none;">
+                            <div class="form-group mb-3">
+                                <label for="modal_edit_product_amount" class="font-weight-bold text-info">
+                                    <i class="fas fa-box-open mr-1"></i>Product Exchange Deduction ($) <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend"><span class="input-group-text text-info font-weight-bold">$</span></div>
+                                    <input type="number" step="0.01" min="0" name="product_amount" id="modal_edit_product_amount" 
+                                           class="form-control form-control-lg font-weight-bold" oninput="updateEditCalc()">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6" id="modalEditWrapperMethod">
+                            <div class="form-group mb-3">
+                                <label for="modal_edit_method" class="font-weight-bold" id="modalEditLblMethod">Payment Method <span class="text-danger">*</span></label>
+                                <select name="payment_method" id="modal_edit_method" class="form-control form-control-lg" required>
+                                    <option value="cash">Cash</option>
+                                    <option value="bank_transfer">Bank Transfer</option>
+                                    <option value="online">Online Payment</option>
+                                    <option value="check">Check</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Product Terms -->
+                    <div class="form-group mb-3" id="modalEditWrapperProductDetails" style="display: none;">
+                        <label for="modal_edit_product_details" class="font-weight-bold text-info">
+                            <i class="fas fa-clipboard-list mr-1"></i>Product Barter Items & Description
+                        </label>
+                        <textarea name="product_details" id="modal_edit_product_details" rows="2" 
+                                  class="form-control" placeholder="Describe goods received for barter deduction..."></textarea>
+                    </div>
+
+                    <!-- Calculation Box -->
+                    <div class="calc-modal-box mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted font-weight-bold">Total Credited Value:</span>
+                            <span class="font-weight-bold text-primary" id="modalEditTotalCredited" style="font-size: 1.25rem;">$0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Status, Date, Notes -->
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group mb-3">
+                                <label for="modal_edit_status" class="font-weight-bold">Status <span class="text-danger">*</span></label>
+                                <select name="status" id="modal_edit_status" class="form-control" required>
+                                    <option value="completed">Completed</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="failed">Failed</option>
+                                    <option value="refunded">Refunded</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group mb-3">
+                                <label for="modal_edit_paid_at" class="font-weight-bold">Date & Time</label>
+                                <input type="datetime-local" name="paid_at" id="modal_edit_paid_at" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group mb-3">
+                                <label for="modal_edit_transaction_id">Transaction ID</label>
+                                <input type="text" name="transaction_id" id="modal_edit_transaction_id" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="form-group mb-0">
+                                <label for="modal_edit_notes">Notes</label>
+                                <textarea name="notes" id="modal_edit_notes" class="form-control" rows="2"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top d-flex justify-content-between">
+                    <a href="" id="modalEditFullPageLink" class="btn btn-outline-secondary btn-sm" target="_blank">
+                        <i class="fas fa-external-link-alt mr-1"></i>Full Edit Page
+                    </a>
+                    <div>
+                        <button type="button" class="btn btn-secondary mr-1" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary font-weight-bold px-4">
+                            <i class="fas fa-save mr-1"></i>Save Changes
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 3: View Payment Details Modal -->
+<div class="modal fade" id="viewPaymentModal" tabindex="-1" role="dialog" aria-labelledby="viewPaymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-white border-bottom">
+                <h5 class="modal-title font-weight-bold" id="viewPaymentModalLabel">
+                    <i class="fas fa-receipt text-primary mr-2"></i>Payment Receipt #<span id="viewModalId"></span>
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="p-4 bg-light border-bottom text-center">
+                    <span class="text-muted text-uppercase small font-weight-bold d-block">Total Value Credited</span>
+                    <h2 class="text-primary font-weight-bold my-1" id="viewModalAmount">$0.00</h2>
+                    <div id="viewModalStatusBadge" class="mt-2"></div>
+                </div>
+                <div class="p-4">
+                    <div class="row mb-2">
+                        <div class="col-6 text-muted">Payment Date:</div>
+                        <div class="col-6 text-right font-weight-bold text-dark" id="viewModalDate">-</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-6 text-muted">Payment Method:</div>
+                        <div class="col-6 text-right font-weight-bold" id="viewModalMethod">-</div>
+                    </div>
+                    <div id="viewModalSplitBreakdown" style="display: none;">
+                        <div class="row mb-2 pl-3">
+                            <div class="col-6 text-success"><i class="fas fa-coins mr-1"></i>Money Portion:</div>
+                            <div class="col-6 text-right font-weight-bold text-success" id="viewModalCashPortion">$0.00</div>
+                        </div>
+                        <div class="row mb-2 pl-3">
+                            <div class="col-6 text-info"><i class="fas fa-boxes mr-1"></i>Product Deduction:</div>
+                            <div class="col-6 text-right font-weight-bold text-info" id="viewModalProductPortion">$0.00</div>
+                        </div>
+                    </div>
+                    <div id="viewModalProductTermsRow" class="mb-2" style="display: none;">
+                        <div class="text-muted small mb-1"><i class="fas fa-info-circle mr-1"></i>Exchanged Items / Terms:</div>
+                        <div class="p-2 rounded bg-light border small text-dark" id="viewModalProductTerms">-</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-6 text-muted">Recorded By:</div>
+                        <div class="col-6 text-right text-dark" id="viewModalUser">-</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-6 text-muted">Transaction Ref:</div>
+                        <div class="col-6 text-right text-dark" id="viewModalTxn">-</div>
+                    </div>
+                    <div class="mt-3 pt-2 border-top">
+                        <span class="text-muted small d-block">Notes:</span>
+                        <p class="text-dark small mb-0 mt-1" id="viewModalNotes">—</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-top d-flex justify-content-between">
+                <a href="" id="viewModalInvoiceBtn" target="_blank" class="btn btn-outline-primary btn-sm font-weight-bold">
+                    <i class="fas fa-file-invoice mr-1"></i>Print Invoice
+                </a>
+                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Close</button>
+            </div>
+        </div>
     </div>
 </div>
 @endsection
@@ -676,6 +1170,372 @@ function deleteBooking(id) {
                 Swal.fire('Error', 'An error occurred while deleting the booking.', 'error');
                 console.error('Error:', error);
             });
+        }
+    });
+}
+
+// ==========================================
+// PAYMENT HISTORY CRUD FUNCTIONS
+// ==========================================
+
+function setQuickRecordStructure(structure) {
+    document.getElementById('modalRecCardStandard')?.classList.toggle('active', structure === 'standard');
+    document.getElementById('modalRecCardSplit')?.classList.toggle('active', structure === 'split');
+    document.getElementById('modalRecCardProduct')?.classList.toggle('active', structure === 'product_exchange');
+
+    const wrapperStandard = document.getElementById('modalRecWrapperStandard');
+    const wrapperCash = document.getElementById('modalRecWrapperCash');
+    const wrapperProduct = document.getElementById('modalRecWrapperProduct');
+    const wrapperMethod = document.getElementById('modalRecWrapperMethod');
+    const wrapperDetails = document.getElementById('modalRecWrapperProductDetails');
+    const lblMethod = document.getElementById('modalRecLblMethod');
+
+    if (structure === 'standard') {
+        if (wrapperStandard) wrapperStandard.style.display = '';
+        if (wrapperCash) wrapperCash.style.display = 'none';
+        if (wrapperProduct) wrapperProduct.style.display = 'none';
+        if (wrapperMethod) wrapperMethod.style.display = '';
+        if (wrapperDetails) wrapperDetails.style.display = 'none';
+        if (lblMethod) lblMethod.textContent = 'Payment Method';
+    } else if (structure === 'split') {
+        if (wrapperStandard) wrapperStandard.style.display = 'none';
+        if (wrapperCash) wrapperCash.style.display = '';
+        if (wrapperProduct) wrapperProduct.style.display = '';
+        if (wrapperMethod) wrapperMethod.style.display = '';
+        if (wrapperDetails) wrapperDetails.style.display = '';
+        if (lblMethod) lblMethod.textContent = 'Cash/Transfer Method';
+    } else if (structure === 'product_exchange') {
+        if (wrapperStandard) wrapperStandard.style.display = 'none';
+        if (wrapperCash) wrapperCash.style.display = 'none';
+        if (wrapperProduct) wrapperProduct.style.display = '';
+        if (wrapperMethod) wrapperMethod.style.display = 'none';
+        if (wrapperDetails) wrapperDetails.style.display = '';
+    }
+
+    updateQuickRecCalc();
+}
+
+function updateQuickRecCalc() {
+    const isStandard = document.getElementById('modal_rec_standard')?.checked;
+    const isSplit = document.getElementById('modal_rec_split')?.checked;
+    const isProduct = document.getElementById('modal_rec_product')?.checked;
+
+    let total = 0;
+    if (isStandard) {
+        total = parseFloat(document.getElementById('modal_rec_amount')?.value) || 0;
+    } else if (isSplit) {
+        const cash = parseFloat(document.getElementById('modal_rec_cash_amount')?.value) || 0;
+        const product = parseFloat(document.getElementById('modal_rec_product_amount')?.value) || 0;
+        total = cash + product;
+    } else if (isProduct) {
+        total = parseFloat(document.getElementById('modal_rec_product_amount')?.value) || 0;
+    }
+
+    const badge = document.getElementById('modalRecTotalCredited');
+    if (badge) badge.textContent = '$' + total.toFixed(2);
+}
+
+function quickFillRecBalance() {
+    const balance = {{ (float) ($book->balance_amount > 0 ? $book->balance_amount : ($book->total_amount ?? 0)) }};
+    const isStandard = document.getElementById('modal_rec_standard')?.checked;
+    const isSplit = document.getElementById('modal_rec_split')?.checked;
+    const isProduct = document.getElementById('modal_rec_product')?.checked;
+
+    if (isStandard) {
+        const input = document.getElementById('modal_rec_amount');
+        if (input) input.value = balance.toFixed(2);
+    } else if (isSplit) {
+        const cashInput = document.getElementById('modal_rec_cash_amount');
+        if (cashInput && (!cashInput.value || parseFloat(cashInput.value) === 0)) {
+            cashInput.value = balance.toFixed(2);
+        }
+    } else if (isProduct) {
+        const prodInput = document.getElementById('modal_rec_product_amount');
+        if (prodInput) prodInput.value = balance.toFixed(2);
+    }
+    updateQuickRecCalc();
+}
+
+function setEditStructure(structure) {
+    document.getElementById('modalEditCardStandard')?.classList.toggle('active', structure === 'standard');
+    document.getElementById('modalEditCardSplit')?.classList.toggle('active', structure === 'split');
+    document.getElementById('modalEditCardProduct')?.classList.toggle('active', structure === 'product_exchange');
+
+    const wrapperStandard = document.getElementById('modalEditWrapperStandard');
+    const wrapperCash = document.getElementById('modalEditWrapperCash');
+    const wrapperProduct = document.getElementById('modalEditWrapperProduct');
+    const wrapperMethod = document.getElementById('modalEditWrapperMethod');
+    const wrapperDetails = document.getElementById('modalEditWrapperProductDetails');
+    const lblMethod = document.getElementById('modalEditLblMethod');
+
+    if (structure === 'standard') {
+        if (wrapperStandard) wrapperStandard.style.display = '';
+        if (wrapperCash) wrapperCash.style.display = 'none';
+        if (wrapperProduct) wrapperProduct.style.display = 'none';
+        if (wrapperMethod) wrapperMethod.style.display = '';
+        if (wrapperDetails) wrapperDetails.style.display = 'none';
+        if (lblMethod) lblMethod.textContent = 'Payment Method';
+    } else if (structure === 'split') {
+        if (wrapperStandard) wrapperStandard.style.display = 'none';
+        if (wrapperCash) wrapperCash.style.display = '';
+        if (wrapperProduct) wrapperProduct.style.display = '';
+        if (wrapperMethod) wrapperMethod.style.display = '';
+        if (wrapperDetails) wrapperDetails.style.display = '';
+        if (lblMethod) lblMethod.textContent = 'Cash/Transfer Method';
+    } else if (structure === 'product_exchange') {
+        if (wrapperStandard) wrapperStandard.style.display = 'none';
+        if (wrapperCash) wrapperCash.style.display = 'none';
+        if (wrapperProduct) wrapperProduct.style.display = '';
+        if (wrapperMethod) wrapperMethod.style.display = 'none';
+        if (wrapperDetails) wrapperDetails.style.display = '';
+    }
+
+    updateEditCalc();
+}
+
+function updateEditCalc() {
+    const isStandard = document.getElementById('modal_edit_standard')?.checked;
+    const isSplit = document.getElementById('modal_edit_split')?.checked;
+    const isProduct = document.getElementById('modal_edit_product')?.checked;
+
+    let total = 0;
+    if (isStandard) {
+        total = parseFloat(document.getElementById('modal_edit_amount')?.value) || 0;
+    } else if (isSplit) {
+        const cash = parseFloat(document.getElementById('modal_edit_cash_amount')?.value) || 0;
+        const product = parseFloat(document.getElementById('modal_edit_product_amount')?.value) || 0;
+        total = cash + product;
+    } else if (isProduct) {
+        total = parseFloat(document.getElementById('modal_edit_product_amount')?.value) || 0;
+    }
+
+    const badge = document.getElementById('modalEditTotalCredited');
+    if (badge) badge.textContent = '$' + total.toFixed(2);
+}
+
+function openEditPaymentModal(payment) {
+    if (!payment) return;
+
+    document.getElementById('editModalPaymentIdText').textContent = payment.id;
+    document.getElementById('editPaymentModalForm').action = `/finance/payments/${payment.id}`;
+    document.getElementById('modalEditFullPageLink').href = `/finance/payments/${payment.id}/edit`;
+
+    const isSplit = (payment.payment_method === 'split' || (payment.cash_amount > 0 && payment.product_amount > 0));
+    const isProduct = (payment.payment_method === 'product_exchange');
+    const structure = isSplit ? 'split' : (isProduct ? 'product_exchange' : 'standard');
+
+    document.getElementById('modal_edit_standard').checked = (structure === 'standard');
+    document.getElementById('modal_edit_split').checked = (structure === 'split');
+    document.getElementById('modal_edit_product').checked = (structure === 'product_exchange');
+
+    document.getElementById('modal_edit_amount').value = parseFloat(payment.amount || 0).toFixed(2);
+    document.getElementById('modal_edit_cash_amount').value = parseFloat(payment.cash_amount || payment.amount || 0).toFixed(2);
+    document.getElementById('modal_edit_product_amount').value = parseFloat(payment.product_amount || (isProduct ? payment.amount : 0)).toFixed(2);
+    document.getElementById('modal_edit_product_details').value = payment.product_details || '';
+
+    const methodSelect = document.getElementById('modal_edit_method');
+    if (methodSelect) {
+        methodSelect.value = payment.cash_payment_method || (payment.payment_method !== 'split' && payment.payment_method !== 'product_exchange' ? payment.payment_method : 'cash');
+    }
+
+    const statusSelect = document.getElementById('modal_edit_status');
+    if (statusSelect) {
+        statusSelect.value = payment.status || 'completed';
+    }
+
+    if (payment.paid_at) {
+        const d = new Date(payment.paid_at);
+        const pad = (n) => String(n).padStart(2, '0');
+        const formattedDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        document.getElementById('modal_edit_paid_at').value = formattedDate;
+    }
+
+    document.getElementById('modal_edit_transaction_id').value = payment.transaction_id || '';
+    document.getElementById('modal_edit_notes').value = payment.notes || '';
+
+    setEditStructure(structure);
+    $('#editPaymentModal').modal('show');
+}
+
+function viewPaymentDetails(payment, username) {
+    if (!payment) return;
+
+    document.getElementById('viewModalId').textContent = payment.id;
+    document.getElementById('viewModalAmount').textContent = '$' + parseFloat(payment.amount || 0).toFixed(2);
+
+    const statusColors = {
+        'completed': 'badge-success',
+        'pending': 'badge-warning',
+        'failed': 'badge-danger',
+        'refunded': 'badge-purple'
+    };
+    const badgeClass = statusColors[payment.status] || 'badge-secondary';
+    document.getElementById('viewModalStatusBadge').innerHTML = `<span class="badge ${badgeClass} px-3 py-1 font-weight-bold text-uppercase" style="font-size: 0.85rem;">${payment.status || 'completed'}</span>`;
+
+    let dateStr = '—';
+    if (payment.paid_at) {
+        const d = new Date(payment.paid_at);
+        dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+    document.getElementById('viewModalDate').textContent = dateStr;
+
+    const isSplit = (payment.payment_method === 'split' || (payment.cash_amount > 0 && payment.product_amount > 0));
+    const isProduct = (payment.payment_method === 'product_exchange');
+
+    let methodLabel = (payment.payment_method || '').replace('_', ' ').toUpperCase();
+    if (isSplit) methodLabel = 'SPLIT (MONEY + PRODUCT)';
+    if (isProduct) methodLabel = 'PRODUCT EXCHANGE BARTER';
+    document.getElementById('viewModalMethod').textContent = methodLabel;
+
+    const splitBox = document.getElementById('viewModalSplitBreakdown');
+    if (isSplit) {
+        splitBox.style.display = '';
+        document.getElementById('viewModalCashPortion').textContent = '$' + parseFloat(payment.cash_amount || 0).toFixed(2);
+        document.getElementById('viewModalProductPortion').textContent = '$' + parseFloat(payment.product_amount || 0).toFixed(2);
+    } else {
+        splitBox.style.display = 'none';
+    }
+
+    const termsRow = document.getElementById('viewModalProductTermsRow');
+    if ((isSplit || isProduct) && payment.product_details) {
+        termsRow.style.display = '';
+        document.getElementById('viewModalProductTerms').textContent = payment.product_details;
+    } else {
+        termsRow.style.display = 'none';
+    }
+
+    document.getElementById('viewModalUser').textContent = username || 'System';
+    document.getElementById('viewModalTxn').textContent = payment.transaction_id || '—';
+    document.getElementById('viewModalNotes').textContent = payment.notes || 'No notes provided.';
+    document.getElementById('viewModalInvoiceBtn').href = `/finance/payments/${payment.id}/invoice`;
+
+    $('#viewPaymentModal').modal('show');
+}
+
+function deleteBookingPayment(paymentId, amountFormatted) {
+    Swal.fire({
+        title: 'Delete Payment #' + paymentId + '?',
+        html: `Are you sure you want to permanently delete payment <strong>#${paymentId}</strong> ($${amountFormatted}) from this booking?<br><br>• Booking paid amount and remaining balance will be recalculated immediately.<br>• Booth payment status will update automatically.<br><br><strong class="text-danger">This action cannot be undone!</strong>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, delete payment!',
+        cancelButtonText: 'Cancel',
+        showLoaderOnConfirm: true,
+        preConfirm: () => {
+            return fetch(`/finance/payments/${paymentId}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => { throw new Error(err.message || 'Delete failed'); });
+                }
+                return response.json();
+            })
+            .catch(error => {
+                Swal.showValidationMessage(`Request failed: ${error.message}`);
+            });
+        },
+        allowOutsideClick: () => !Swal.isLoading()
+    }).then((result) => {
+        if (result.isConfirmed && result.value) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Payment Deleted',
+                text: result.value.message || 'Payment has been deleted.',
+                timer: 1500,
+                showConfirmButton: false
+            }).then(() => location.reload());
+        }
+    });
+}
+
+function refundBookingPayment(paymentId, amountFormatted) {
+    Swal.fire({
+        title: 'Refund Payment #' + paymentId + '?',
+        html: `Are you sure you want to refund payment <strong>#${paymentId}</strong> ($${amountFormatted})?<br><br>This will create a refund credit and adjust booking and booth balances.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#007AFF',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, refund',
+        cancelButtonText: 'Cancel',
+        input: 'textarea',
+        inputPlaceholder: 'Optional: Refund reason or notes...',
+        showLoaderOnConfirm: true,
+        preConfirm: (notes) => {
+            return fetch(`/finance/payments/${paymentId}/refund`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ notes: notes || '', redirect_to: 'booking' })
+            })
+            .then(response => {
+                if (response.redirected) {
+                    window.location.href = response.url;
+                    return;
+                }
+                return response.json();
+            })
+            .catch(error => {
+                Swal.showValidationMessage(`Request failed: ${error.message}`);
+            });
+        },
+        allowOutsideClick: () => !Swal.isLoading()
+    }).then((result) => {
+        if (result.isConfirmed || result.value) {
+            location.reload();
+        }
+    });
+}
+
+function voidBookingPayment(paymentId) {
+    Swal.fire({
+        title: 'Void Payment #' + paymentId + '?',
+        html: `Are you sure you want to void payment <strong>#${paymentId}</strong>?<br><br>This marks the payment as failed/voided and recalculates balances.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, void it',
+        cancelButtonText: 'Cancel',
+        input: 'textarea',
+        inputPlaceholder: 'Optional: Void reason...',
+        showLoaderOnConfirm: true,
+        preConfirm: (notes) => {
+            return fetch(`/finance/payments/${paymentId}/void`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ notes: notes || '', redirect_to: 'booking' })
+            })
+            .then(response => {
+                if (response.redirected) {
+                    window.location.href = response.url;
+                    return;
+                }
+                return response.json();
+            })
+            .catch(error => {
+                Swal.showValidationMessage(`Request failed: ${error.message}`);
+            });
+        },
+        allowOutsideClick: () => !Swal.isLoading()
+    }).then((result) => {
+        if (result.isConfirmed || result.value) {
+            location.reload();
         }
     });
 }

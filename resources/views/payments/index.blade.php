@@ -300,6 +300,9 @@
                                    class="action-btn action-btn-secondary action-btn-icon"
                                    target="_blank" rel="noopener noreferrer"
                                    title="View invoice"><i class="fas fa-file-invoice" aria-hidden="true"></i></a>
+                                <a href="{{ route('finance.payments.edit', $payment->id) }}"
+                                   class="action-btn action-btn-secondary action-btn-icon"
+                                   title="Edit payment"><i class="fas fa-edit" aria-hidden="true"></i></a>
                                 @if($payment->booking_id)
                                 <a href="{{ route('books.show', $payment->booking_id) }}"
                                    class="action-btn action-btn-secondary action-btn-icon"
@@ -318,10 +321,14 @@
                                 @endif
                                 @if(in_array($payment->status, [\App\Models\Payment::STATUS_COMPLETED, \App\Models\Payment::STATUS_PENDING]))
                                 <button type="button"
-                                        class="action-btn action-btn-danger-soft action-btn-icon"
+                                        class="action-btn action-btn-secondary action-btn-icon"
                                         onclick="voidPayment({{ $payment->id }})"
                                         title="Void payment"><i class="fas fa-ban" aria-hidden="true"></i></button>
                                 @endif
+                                <button type="button"
+                                        class="action-btn action-btn-danger-soft action-btn-icon"
+                                        onclick="deletePayment({{ $payment->id }}, '{{ number_format($payment->amount, 2) }}')"
+                                        title="Delete payment"><i class="fas fa-trash-alt" aria-hidden="true"></i></button>
                             </div>
                         </td>
                     </tr>
@@ -478,6 +485,45 @@ function voidPayment(paymentId) {
             } else {
                 location.reload();
             }
+        }
+    });
+}
+
+function deletePayment(paymentId, amountFormatted) {
+    Swal.fire({
+        title: 'Delete Payment #' + paymentId + '?',
+        html: `Are you sure you want to permanently delete payment <strong>#${paymentId}</strong> ($${amountFormatted})?<br><br>This will:<br>• Remove this payment record permanently<br>• Recalculate booking balance and booth status<br><br><strong class="text-danger">This action cannot be undone!</strong>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, delete payment!',
+        cancelButtonText: 'Cancel',
+        showLoaderOnConfirm: true,
+        preConfirm: () => {
+            return fetch(`/finance/payments/${paymentId}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => { throw new Error(err.message || 'Delete failed'); });
+                }
+                return response.json();
+            })
+            .catch(error => {
+                Swal.showValidationMessage(`Request failed: ${error.message}`);
+            });
+        },
+        allowOutsideClick: () => !Swal.isLoading()
+    }).then((result) => {
+        if (result.isConfirmed && result.value) {
+            Swal.fire('Deleted!', result.value.message || 'Payment has been deleted.', 'success')
+                .then(() => location.reload());
         }
     });
 }

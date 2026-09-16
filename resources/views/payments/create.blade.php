@@ -93,6 +93,7 @@
         </div>
         <form action="{{ route('finance.payments.store') }}" method="POST" id="paymentForm">
             @csrf
+            <input type="hidden" name="redirect_to" value="{{ request('redirect_to', (isset($booking) && $booking) || request('booking_id') ? 'booking' : 'index') }}">
             <div class="card-body">
                 <!-- General Error Display -->
                 @if($errors->any())
@@ -347,9 +348,19 @@
             </div>
 
             <div class="card-footer bg-light d-flex justify-content-between">
-                <a href="{{ route('finance.payments.index') }}" class="btn btn-secondary">
-                    <i class="fas fa-times mr-1"></i>Cancel
-                </a>
+                @if(isset($booking) && $booking)
+                    <a href="{{ route('books.show', $booking->id) }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left mr-1"></i>Back to Booking #{{ $booking->id }}
+                    </a>
+                @elseif(request('booking_id'))
+                    <a href="{{ route('books.show', request('booking_id')) }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left mr-1"></i>Back to Booking #{{ request('booking_id') }}
+                    </a>
+                @else
+                    <a href="{{ route('finance.payments.index') }}" class="btn btn-secondary">
+                        <i class="fas fa-times mr-1"></i>Cancel
+                    </a>
+                @endif
                 <button type="submit" class="btn btn-primary px-4 font-weight-bold">
                     <i class="fas fa-save mr-1"></i>Record Payment
                 </button>
