@@ -5,7 +5,7 @@
 
 @push('styles')
 <link rel="stylesheet" href="{{ asset('css/dashboard-looker.css') }}?v=3.6">
-<link rel="stylesheet" href="{{ asset('css/books-page-index.css') }}?v=1.3">
+<link rel="stylesheet" href="{{ asset('css/books-page-index.css') }}?v=1.4">
 <link rel="stylesheet" href="{{ asset('css/booths-on-books.css') }}?v=2.4">
 @endpush
 
@@ -319,7 +319,7 @@
 @php
     $lazyLoadMoreAvailable = ($groupBy === 'none' && isset($total, $books) && $total > $books->count());
 @endphp
-<script src="{{ asset('js/books-table-column-resize.js') }}?v=2"></script>
+<script src="{{ asset('js/books-table-column-resize.js') }}?v=3"></script>
 <script>
 (function() {
     'use strict';

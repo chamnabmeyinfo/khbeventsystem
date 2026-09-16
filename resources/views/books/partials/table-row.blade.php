@@ -28,11 +28,13 @@
 <tr class="books-table-row" onclick="window.location='{{ route('books.show', $book) }}'">
     <td class="books-col-rownum">{{ $rowNumber ?? '—' }}</td>
     <td class="books-col-id"><strong>#{{ $book->id }}</strong></td>
-    <td>
+    <td class="books-col-client">
         @if($book->client)
             @php $c = $book->client; @endphp
-            <strong>{{ $c->company ?? $c->name }}</strong>
-            <br><small class="text-muted">Contact Name: {{ $c->name ?? $c->company ?? '—' }} · ID {{ $c->id }}</small>
+            <div class="text-truncate" title="{{ $c->company ?? $c->name }}">
+                <strong>{{ $c->company ?? $c->name }}</strong>
+            </div>
+            <small class="text-muted text-truncate d-block" title="Contact Name: {{ $c->name ?? $c->company ?? '—' }} · ID {{ $c->id }}">Contact: {{ $c->name ?? $c->company ?? '—' }} · ID {{ $c->id }}</small>
         @else
             <span class="text-muted">N/A</span>
         @endif
@@ -50,7 +52,7 @@
                             <x-avatar
                                 :avatar="$u->avatar"
                                 :name="$u->username"
-                                size="34px"
+                                size="30px"
                                 :type="$u->isAdmin() ? 'admin' : 'user'"
                                 shape="circle"
                             />
@@ -64,7 +66,7 @@
                         <x-avatar
                             :avatar="$u->avatar"
                             :name="$u->username"
-                            size="34px"
+                            size="30px"
                             :type="$u->isAdmin() ? 'admin' : 'user'"
                             shape="circle"
                         />
@@ -78,21 +80,21 @@
             <span class="text-muted small">—</span>
         @endif
     </td>
-    <td>
-        <span title="{{ $eventName ? 'Event: ' . $eventName : '' }}">{{ $floorPlanName }}</span>
+    <td class="books-col-floorplan">
+        <div class="text-truncate" title="{{ $eventName ? 'Event: ' . $eventName : $floorPlanName }}">{{ $floorPlanName }}</div>
         @if($eventName)
-        <br><small class="text-muted">{{ Str::limit($eventName, 20) }}</small>
+        <small class="text-muted text-truncate d-block" title="{{ $eventName }}">{{ $eventName }}</small>
         @endif
     </td>
-    <td>
-        {{ $book->date_book->format('M d, Y') }}<br>
-        <small class="text-muted">{{ $book->date_book->format('h:i A') }}</small>
+    <td class="books-col-date">
+        <div class="text-nowrap">{{ $book->date_book ? $book->date_book->format('M d, Y') : '—' }}</div>
+        <small class="text-muted text-nowrap"><i class="fas fa-clock me-1" aria-hidden="true"></i>{{ $book->date_book ? $book->date_book->format('h:i A') : '—' }}</small>
     </td>
-    <td>
-        <strong>{{ $boothCount }}</strong> {{ $boothCount == 1 ? 'Booth' : 'Booths' }}
-        <br><small class="text-muted" title="{{ $boothNumbers }}">{{ Str::limit($boothNumbers, 30) ?: '—' }}</small>
+    <td class="books-col-booths">
+        <div class="text-nowrap"><strong>{{ $boothCount }}</strong> {{ $boothCount == 1 ? 'Booth' : 'Booths' }}</div>
+        <small class="text-muted text-truncate d-block" title="{{ $boothNumbers }}">{{ $boothNumbers }}</small>
     </td>
-    <td>
+    <td class="books-col-type text-center">
         <span class="books-type-badge {{ $typeBadgeClass }}">
             @if($book->type == 1) Regular
             @elseif($book->type == 2) Special
@@ -101,12 +103,14 @@
             @endif
         </span>
     </td>
-    <td>
+    <td class="books-col-status text-center">
         <span class="books-status-pill" style="background-color: {{ $statusColor }}; color: {{ $statusTextColor }};">
             {{ $statusName }}
         </span>
     </td>
-    <td><strong class="books-amount-cell">${{ number_format($totalAmount, 2) }}</strong></td>
+    <td class="books-col-amount">
+        <strong class="books-amount-cell text-nowrap">${{ number_format($totalAmount, 2) }}</strong>
+    </td>
     <td class="books-col-actions" onclick="event.stopPropagation()">
         <div class="books-table-actions" role="group" aria-label="Row actions">
             <button type="button" class="books-table-btn plastic-btn-press" onclick="showBookingInfo({{ $book->id }})" title="Quick view">

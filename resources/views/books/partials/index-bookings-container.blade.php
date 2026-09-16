@@ -20,17 +20,17 @@
                         <table class="looker-table books-looker-table mb-0">
                             <thead>
                                 <tr>
-                                    <th scope="col">Row</th>
-                                    <th>ID</th>
-                                    <th>Client</th>
-                                    <th class="text-center">Team</th>
-                                    <th>Floor Plan</th>
-                                    <th>Date</th>
-                                    <th>Booths</th>
-                                    <th>Type</th>
-                                    <th>Status</th>
-                                    <th>Amount</th>
-                                    <th>Actions</th>
+                                    <th scope="col" class="books-th-rownum">Row</th>
+                                    <th class="books-th-id">ID</th>
+                                    <th class="books-th-client">Client</th>
+                                    <th class="books-th-team text-center">Team</th>
+                                    <th class="books-th-floorplan">Floor Plan</th>
+                                    <th class="books-th-date">Date</th>
+                                    <th class="books-th-booths">Booths</th>
+                                    <th class="books-th-type text-center">Type</th>
+                                    <th class="books-th-status text-center">Status</th>
+                                    <th class="books-th-amount">Amount</th>
+                                    <th class="books-th-actions text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -71,17 +71,17 @@
                 <table class="looker-table books-looker-table mb-0" id="bookingsTable">
                     <thead>
                         <tr>
-                            <th scope="col">Row</th>
-                            <th>ID</th>
-                            <th>Client</th>
-                            <th class="text-center">Team</th>
-                            <th>Floor Plan</th>
-                            <th>Date</th>
-                            <th>Booths</th>
-                            <th>Type</th>
-                            <th>Status</th>
-                            <th>Amount</th>
-                            <th>Actions</th>
+                            <th scope="col" class="books-th-rownum">Row</th>
+                            <th class="books-th-id">ID</th>
+                            <th class="books-th-client">Client</th>
+                            <th class="books-th-team text-center">Team</th>
+                            <th class="books-th-floorplan">Floor Plan</th>
+                            <th class="books-th-date">Date</th>
+                            <th class="books-th-booths">Booths</th>
+                            <th class="books-th-type text-center">Type</th>
+                            <th class="books-th-status text-center">Status</th>
+                            <th class="books-th-amount">Amount</th>
+                            <th class="books-th-actions text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="bookingsTableBody">

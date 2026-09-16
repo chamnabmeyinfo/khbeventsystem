@@ -1,14 +1,15 @@
 /**
  * Drag-to-resize columns for .books-looker-table (e.g. /books, /booths).
- * Persists widths in localStorage. Default key: booksTableColumnWidths_v1.
+ * Always normalizes column widths so the table fits 100% inside .table-view.
+ * Persists relative widths in localStorage. Default key: booksTableColumnWidths_v3.
  * Set data-books-column-resize-key="booths" (or any id) on the table for a separate key.
+ * Double-click any resize handle to reset column widths to default.
  */
 (function () {
     'use strict';
 
-    var DEFAULT_STORAGE_KEY = 'booksTableColumnWidths_v2';
-    var MIN_W = 48;
-    var MAX_W = 640;
+    var DEFAULT_STORAGE_KEY = 'booksTableColumnWidths_v3';
+    var MIN_W = 32;
 
     function getStorageKey(table) {
         if (!table || !table.getAttribute) {
@@ -16,7 +17,7 @@
         }
         var k = table.getAttribute('data-books-column-resize-key');
         if (k) {
-            return 'booksLookerTableColumnWidths_' + k + '_v2';
+            return 'booksLookerTableColumnWidths_' + k + '_v3';
         }
         return DEFAULT_STORAGE_KEY;
     }
@@ -26,14 +27,14 @@
     }
 
     function applyColumnWidth(table, colIndex, widthPx) {
-        var w = clamp(Math.round(widthPx), MIN_W, MAX_W) + 'px';
+        var tableWidth = table.getBoundingClientRect().width || table.clientWidth || 1000;
+        var w = clamp(Math.round(widthPx), MIN_W, tableWidth * 0.45);
         var ths = table.querySelectorAll('thead tr th');
         var th = ths[colIndex];
         if (!th) return;
-        th.style.width = w;
-        th.style.minWidth = w;
-        th.style.maxWidth = w;
-        /* table-layout: fixed — column width applies to all rows including lazy-loaded tbody */
+        var pct = ((w / tableWidth) * 100).toFixed(2) + '%';
+        th.style.width = pct;
+        th.style.minWidth = '0';
     }
 
     function applySavedWidths(table) {
@@ -42,11 +43,21 @@
             if (!raw) return;
             var widths = JSON.parse(raw);
             if (!Array.isArray(widths)) return;
-            var n = table.querySelectorAll('thead tr th').length;
-            if (widths.length !== n) return;
-            for (var i = 0; i < n && i < widths.length; i++) {
+            var ths = table.querySelectorAll('thead tr th');
+            if (widths.length !== ths.length) return;
+
+            var sum = 0;
+            for (var k = 0; k < widths.length; k++) {
+                sum += (typeof widths[k] === 'number' && widths[k] > 0 ? widths[k] : 100);
+            }
+            if (sum <= 0) return;
+
+            for (var i = 0; i < ths.length; i++) {
                 if (typeof widths[i] === 'number' && widths[i] > 0) {
-                    applyColumnWidth(table, i, widths[i]);
+                    var pct = ((widths[i] / sum) * 100).toFixed(2) + '%';
+                    ths[i].style.width = pct;
+                    ths[i].style.maxWidth = pct;
+                    ths[i].style.minWidth = '0';
                 }
             }
         } catch (e) {}
@@ -87,6 +98,7 @@
             document.removeEventListener('touchcancel', onUp);
             document.body.classList.remove('books-table-resizing');
             saveWidths(table);
+            applySavedWidths(table);
         }
 
         document.body.classList.add('books-table-resizing');
@@ -119,7 +131,7 @@
             var grip = document.createElement('span');
             grip.className = 'books-col-resize-handle';
             grip.setAttribute('aria-hidden', 'true');
-            grip.title = 'Drag to resize column';
+            grip.title = 'Drag to resize · Double-click to reset';
 
             grip.addEventListener('mousedown', function (e) {
                 e.preventDefault();
@@ -133,6 +145,19 @@
                 e.preventDefault();
                 beginResize(table, colIndex, th, e.touches[0].pageX);
             }, { passive: false });
+
+            grip.addEventListener('dblclick', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                    localStorage.removeItem(getStorageKey(table));
+                } catch (err) {}
+                ths.forEach(function (cell) {
+                    cell.style.width = '';
+                    cell.style.minWidth = '';
+                    cell.style.maxWidth = '';
+                });
+            });
 
             th.appendChild(grip);
         });
