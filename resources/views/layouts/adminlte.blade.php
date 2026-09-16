@@ -1589,7 +1589,7 @@
 
     {{-- Mobile sheets: loaded earlier with media="(max-width: 768px)" — do not duplicate here (would apply on desktop). --}}
 
-    <link rel="stylesheet" href="{{ asset('css/modern-header.css') }}?v=3.2">
+    <link rel="stylesheet" href="{{ asset('css/modern-header.css') }}?v=4.0">
     <link rel="stylesheet" href="{{ asset('css/app-loading-overlay.css') }}?v=2">
     
     @stack('styles')

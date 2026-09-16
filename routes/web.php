@@ -12,6 +12,7 @@ use App\Http\Controllers\ClientProfileDashboardDemoController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\FloorPlanController;
+use App\Http\Controllers\GitDeploymentController;
 use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\LandingPageSectionTemplateController;
 use App\Http\Controllers\LandingPagePublicController;
@@ -495,6 +496,12 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/versions', [VersionController::class, 'store'])->name('versions.store');
         Route::get('/versions/{version}', [VersionController::class, 'show'])->name('versions.show');
         Route::post('/versions/{version}/set-current', [VersionController::class, 'setCurrent'])->name('versions.set-current');
+
+        // Git & cPanel Deployment Status
+        Route::get('/git-status', [GitDeploymentController::class, 'status'])->name('git.status');
+        Route::post('/git-status/refresh', [GitDeploymentController::class, 'refresh'])->name('git.status.refresh');
+        Route::get('/admin/git-status', [GitDeploymentController::class, 'status'])->name('admin.git-status');
+        Route::post('/admin/git-status/refresh', [GitDeploymentController::class, 'refresh'])->name('admin.git-status.refresh');
 
         // Image Upload Routes
         Route::prefix('images')->name('images.')->group(function () {

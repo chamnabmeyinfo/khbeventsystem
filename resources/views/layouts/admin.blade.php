@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="{{ asset('css/mobile-cross-browser.css') }}?v=2">
     <link rel="stylesheet" href="{{ asset('css/responsive-mobile-first.css') }}?v=2">
 
-    <link rel="stylesheet" href="{{ asset('css/modern-header.css') }}?v=3.2">
+    <link rel="stylesheet" href="{{ asset('css/modern-header.css') }}?v=4.0">
     <link rel="stylesheet" href="{{ asset('css/modern-sidebar.css') }}?v=3.4">
     <link rel="stylesheet" href="{{ asset('css/app-shell-layout.css') }}?v=1.5">
     <link rel="stylesheet" href="{{ asset('vendor/sweetalert2/css/sweetalert2.min.css') }}">

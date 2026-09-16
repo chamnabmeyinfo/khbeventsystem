@@ -70,7 +70,7 @@
     <script src="{{ asset('js/performance-optimizer.js') }}" defer></script>
     @endif
     
-    <link rel="stylesheet" href="{{ asset('css/modern-header.css') }}?v=3.2">
+    <link rel="stylesheet" href="{{ asset('css/modern-header.css') }}?v=4.0">
     <link rel="stylesheet" href="{{ asset('css/modern-sidebar.css') }}?v=3.4">
     <link rel="stylesheet" href="{{ asset('css/app-shell-layout.css') }}?v=1.5">
     <link rel="stylesheet" href="{{ asset('css/sweetalert2-custom.css') }}?v=1">
