@@ -6,7 +6,7 @@
 (function () {
     'use strict';
 
-    var DEFAULT_STORAGE_KEY = 'booksTableColumnWidths_v3';
+    var DEFAULT_STORAGE_KEY = 'booksTableColumnWidths_v2';
     var MIN_W = 48;
     var MAX_W = 640;
 
@@ -16,7 +16,7 @@
         }
         var k = table.getAttribute('data-books-column-resize-key');
         if (k) {
-            return 'booksLookerTableColumnWidths_' + k + '_v3';
+            return 'booksLookerTableColumnWidths_' + k + '_v2';
         }
         return DEFAULT_STORAGE_KEY;
     }

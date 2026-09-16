@@ -20,12 +20,17 @@
                         <table class="looker-table books-looker-table mb-0">
                             <thead>
                                 <tr>
-                                    <th scope="col" style="width: 210px; min-width: 190px;">Booking ID</th>
-                                    <th scope="col" style="min-width: 260px;">Customer &amp; Location</th>
-                                    <th scope="col" style="width: 140px; min-width: 130px;">Date &amp; Time</th>
-                                    <th scope="col" style="width: 160px; min-width: 140px;">Booths</th>
-                                    <th scope="col" style="width: 130px; min-width: 120px;">Total Amount</th>
-                                    <th scope="col" style="width: 180px; min-width: 160px;">Payment &amp; Staff</th>
+                                    <th scope="col">Row</th>
+                                    <th>ID</th>
+                                    <th>Client</th>
+                                    <th class="text-center">Team</th>
+                                    <th>Floor Plan</th>
+                                    <th>Date</th>
+                                    <th>Booths</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Amount</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -39,6 +44,14 @@
                     </div>
                     <!-- Card View -->
                     <div class="card-view" style="display: none;">
+                        <div class="books-card-header-row d-none d-lg-grid">
+                            <div class="bcard-hdr bcard-hdr--id">Booking ID &amp; Type</div>
+                            <div class="bcard-hdr bcard-hdr--customer">Customer &amp; Location</div>
+                            <div class="bcard-hdr bcard-hdr--date">Date &amp; Time</div>
+                            <div class="bcard-hdr bcard-hdr--booths">Booths</div>
+                            <div class="bcard-hdr bcard-hdr--amount">Total Amount</div>
+                            <div class="bcard-hdr bcard-hdr--status">Payment &amp; Staff</div>
+                        </div>
                         <div class="books-card-view-inner booths-card-density--medium">
                             @php $groupCardRowStart = $booksRowCounter - count($groupBooks) + 1; @endphp
                             @foreach($groupBooks as $book)
@@ -58,12 +71,17 @@
                 <table class="looker-table books-looker-table mb-0" id="bookingsTable">
                     <thead>
                         <tr>
-                            <th scope="col" style="width: 210px; min-width: 190px;">Booking ID</th>
-                            <th scope="col" style="min-width: 260px;">Customer &amp; Location</th>
-                            <th scope="col" style="width: 140px; min-width: 130px;">Date &amp; Time</th>
-                            <th scope="col" style="width: 160px; min-width: 140px;">Booths</th>
-                            <th scope="col" style="width: 130px; min-width: 120px;">Total Amount</th>
-                            <th scope="col" style="width: 180px; min-width: 160px;">Payment &amp; Staff</th>
+                            <th scope="col">Row</th>
+                            <th>ID</th>
+                            <th>Client</th>
+                            <th class="text-center">Team</th>
+                            <th>Floor Plan</th>
+                            <th>Date</th>
+                            <th>Booths</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Amount</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="bookingsTableBody">
@@ -71,7 +89,7 @@
                             @include('books.partials.table-row', ['book' => $book, 'rowNumber' => $loop->iteration])
                         @empty
                             <tr>
-                                <td colspan="6" class="text-center py-5">
+                                <td colspan="11" class="text-center py-5">
                                     <div class="empty-state">
                                         <i class="fas fa-inbox empty-state-icon"></i>
                                         <h3>No bookings found</h3>
@@ -89,6 +107,14 @@
             </div>
             <!-- Card View -->
             <div class="card-view" style="display: none;">
+                <div class="books-card-header-row d-none d-lg-grid">
+                    <div class="bcard-hdr bcard-hdr--id">Booking ID &amp; Type</div>
+                    <div class="bcard-hdr bcard-hdr--customer">Customer &amp; Location</div>
+                    <div class="bcard-hdr bcard-hdr--date">Date &amp; Time</div>
+                    <div class="bcard-hdr bcard-hdr--booths">Booths</div>
+                    <div class="bcard-hdr bcard-hdr--amount">Total Amount</div>
+                    <div class="bcard-hdr bcard-hdr--status">Payment &amp; Staff</div>
+                </div>
                 <div class="books-card-view-inner booths-card-density--medium">
                     @forelse($books as $book)
                         @include('books.partials.card', ['book' => $book, 'rowNumber' => $loop->iteration])

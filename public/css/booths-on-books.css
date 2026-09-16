@@ -178,17 +178,17 @@
     align-items: stretch;
 }
 
-.books-page .books-card-view-inner.booths-card-density--small {
+.books-page .books-card-view-inner#boothsCardViewInner.booths-card-density--small {
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
     gap: 0.85rem 1rem;
 }
 
-.books-page .books-card-view-inner.booths-card-density--medium {
+.books-page .books-card-view-inner#boothsCardViewInner.booths-card-density--medium {
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
     gap: 1rem 1.25rem;
 }
 
-.books-page .books-card-view-inner.booths-card-density--large {
+.books-page .books-card-view-inner#boothsCardViewInner.booths-card-density--large {
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
     gap: 1.25rem 1.5rem;
 }

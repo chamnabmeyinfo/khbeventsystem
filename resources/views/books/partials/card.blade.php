@@ -5,15 +5,11 @@
     $boothNumbers = $boothsForBook->pluck('booth_number')->join(', ') ?: '—';
     $floorPlanName = $book->floorPlan->name ?? '—';
     $eventName = optional($book->floorPlan)->event?->title;
-    $typeBadgeClass = 'books-type-regular';
-    if ($book->type == 2) {
-        $typeBadgeClass = 'books-type-special';
-    } elseif ($book->type == 3) {
-        $typeBadgeClass = 'books-type-temporary';
-    }
+    
     $totalAmount = $book->total_amount ?? 0;
     $paidAmount = $book->paid_amount ?? 0;
     $balanceAmount = $book->balance_amount ?? ($totalAmount - $paidAmount);
+
     try {
         $statusSetting = isset($statusSetting) ? $statusSetting : ($book->statusSetting ?? \App\Models\BookingStatusSetting::getByCode($book->status ?? 1));
         $statusColor = $statusSetting ? $statusSetting->status_color : '#6c757d';
@@ -24,122 +20,164 @@
         $statusTextColor = '#ffffff';
         $statusName = 'Pending';
     }
-    $rowNumber = $rowNumber ?? null;
+
+    $c = $book->client;
+    $clientName = $c ? ($c->company ?: $c->name) : 'N/A';
+    $contactName = $c ? ($c->name ?: ($c->company ?: '—')) : '—';
+    $clientId = $c ? $c->id : null;
+    
+    // Dynamic initials & gradients for client avatar fallback matching image_0.png
+    $avatarGradients = [
+        'linear-gradient(135deg, #38bdf8 0%, #818cf8 100%)', // cyan/indigo (SV)
+        'linear-gradient(135deg, #2dd4bf 0%, #06b6d4 100%)', // teal/cyan (SC)
+        'linear-gradient(135deg, #34d399 0%, #10b981 100%)', // mint/emerald (CS)
+        'linear-gradient(135deg, #818cf8 0%, #6366f1 100%)', // indigo (UR)
+        'linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)', // purple/violet (HB)
+        'linear-gradient(135deg, #f472b6 0%, #ec4899 100%)', // pink
+        'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', // amber
+    ];
+    $gradIdx = $c ? ($c->id % count($avatarGradients)) : 0;
+    $avatarBg = $avatarGradients[$gradIdx];
+
+    $clientInitials = 'NA';
+    if ($c) {
+        $rawWords = preg_split('/\s+/', trim($c->company ?: $c->name));
+        if (count($rawWords) >= 2) {
+            $clientInitials = strtoupper(mb_substr($rawWords[0], 0, 1) . mb_substr($rawWords[1], 0, 1));
+        } else {
+            $clientInitials = strtoupper(mb_substr($c->company ?: $c->name, 0, 2));
+        }
+    }
+
+    $clientAvatarUrl = $c ? \App\Helpers\AssetHelper::imageUrl($c->avatar ?? null) : null;
+
+    $staff = $book->user;
+    $staffName = $staff ? ($staff->username ?: ($staff->name ?: 'Staff')) : '—';
 @endphp
-<div class="booking-card books-booking-card books-booking-card--type-{{ (int) $book->type }}" onclick="window.location='{{ route('books.show', $book) }}'">
-    <div class="books-booking-card__head">
-        <div class="books-booking-card__head-text">
-            @if($rowNumber !== null)
-                <span class="books-booking-card__row">Row {{ $rowNumber }}</span>
-            @endif
-            <h3 class="books-booking-card__title">
-                <i class="fas fa-calendar-check me-2" aria-hidden="true"></i>Booking #{{ $book->id }}
-            </h3>
-            <div class="books-booking-card__badges">
-                <span class="books-type-badge {{ $typeBadgeClass }}">
-                    @if($book->type == 1) Regular
-                    @elseif($book->type == 2) Special
-                    @elseif($book->type == 3) Temporary
-                    @else {{ $book->type }}
-                    @endif
-                </span>
-                <span class="books-status-pill" style="background-color: {{ $statusColor }}; color: {{ $statusTextColor }};">
-                    {{ $statusName }}
-                </span>
-            </div>
-        </div>
-        <div class="books-booking-card__actions" onclick="event.stopPropagation()">
-            <div class="books-table-actions" role="group" aria-label="Card actions">
-                <button type="button" class="books-table-btn plastic-btn-press" onclick="showBookingInfo({{ $book->id }})" title="Quick view">
+
+<div class="booking-card books-booking-card books-card-modern books-card-modern--type-{{ (int) $book->type }}" onclick="window.location='{{ route('books.show', $book) }}'">
+    <!-- Column 1: Booking ID, Action buttons & Type -->
+    <div class="bcard-col bcard-col--id">
+        <div class="bcard-id-row">
+            <span class="bcard-id-title">
+                <i class="fas fa-calendar-check me-1 bcard-id-icon" aria-hidden="true"></i>Booking #{{ $book->id }}
+            </span>
+            <div class="bcard-actions-group" onclick="event.stopPropagation()">
+                <button type="button" class="bcard-btn-action bcard-btn-action--view plastic-btn-press" onclick="showBookingInfo({{ $book->id }})" title="Quick view">
                     <i class="fas fa-eye" aria-hidden="true"></i>
                 </button>
                 @if(auth()->user()->isAdmin())
-                <button type="button" class="books-table-btn books-table-btn-danger plastic-btn-press" onclick="deleteBooking({{ $book->id }})" title="Delete booking">
-                    <i class="fas fa-trash" aria-hidden="true"></i>
+                <button type="button" class="bcard-btn-action bcard-btn-action--delete plastic-btn-press" onclick="deleteBooking({{ $book->id }})" title="Delete booking">
+                    <i class="fas fa-trash-alt" aria-hidden="true"></i>
                 </button>
+                @endif
+            </div>
+        </div>
+        <div class="bcard-type-row">
+            <span class="bcard-pill-type bcard-pill-type--{{ (int) $book->type }}">
+                @if($book->type == 1) REGULAR
+                @elseif($book->type == 2) SPECIAL
+                @elseif($book->type == 3) TEMPORARY
+                @else {{ strtoupper($book->type) }}
+                @endif
+            </span>
+        </div>
+    </div>
+
+    <!-- Column 2: Customer & Location -->
+    <div class="bcard-col bcard-col--customer">
+        <div class="bcard-customer-avatar-wrap">
+            @if($clientAvatarUrl)
+                <img src="{{ $clientAvatarUrl }}" alt="{{ $clientName }}" class="bcard-customer-avatar-img" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
+                <div class="bcard-customer-avatar-fallback" style="display: none; background: {{ $avatarBg }};">
+                    {{ $clientInitials }}
+                </div>
+            @else
+                <div class="bcard-customer-avatar-fallback" style="background: {{ $avatarBg }};">
+                    {{ $clientInitials }}
+                </div>
+            @endif
+        </div>
+        <div class="bcard-customer-info">
+            <div class="bcard-customer-name" title="{{ $clientName }}">{{ $clientName }}</div>
+            <div class="bcard-customer-meta">
+                <span class="bcard-contact-text">Contact Name: {{ $contactName }}</span>
+                @if($clientId)
+                    <span class="bcard-meta-dot">·</span>
+                    <span class="bcard-meta-id">ID {{ $clientId }}</span>
+                @endif
+                @if($floorPlanName !== '—' || $eventName)
+                    <span class="bcard-location-badge" title="{{ $eventName ?: $floorPlanName }}">
+                        {{ Str::limit($floorPlanName !== '—' ? $floorPlanName : $eventName, 28) }}
+                    </span>
                 @endif
             </div>
         </div>
     </div>
 
-    <div class="books-booking-card__client">
-        @if($book->client)
-            @php $c = $book->client; @endphp
-            <div class="books-booking-card__avatar">
-                <x-avatar
-                    :avatar="$c->avatar ?? null"
-                    :name="$c->name ?? 'N/A'"
-                    :size="'md'"
-                    :type="'client'"
-                    :shape="'circle'"
-                />
-            </div>
-            <div class="books-booking-card__client-text">
-                <div class="books-booking-card__client-name">{{ $c->company ?? $c->name }}</div>
-                <div class="books-booking-card__client-meta">
-                    Contact Name: {{ $c->name ?? $c->company ?? '—' }} · ID {{ $c->id }}
+    <!-- Column 3: Date & Time -->
+    <div class="bcard-col bcard-col--date">
+        <div class="bcard-date-main">
+            {{ $book->date_book ? $book->date_book->format('M d, Y') : '—' }}
+        </div>
+        <div class="bcard-date-time">
+            <i class="fas fa-clock bcard-clock-icon me-1" aria-hidden="true"></i>
+            {{ $book->date_book ? $book->date_book->format('h:i A') : '—' }}
+        </div>
+    </div>
+
+    <!-- Column 4: Booths -->
+    <div class="bcard-col bcard-col--booths">
+        <div class="bcard-booth-count">
+            <i class="fas fa-store bcard-store-icon me-1" aria-hidden="true"></i>
+            {{ $boothCount }} {{ $boothCount == 1 ? 'Booth' : 'Booths' }}
+        </div>
+        <div class="bcard-booth-numbers text-truncate" title="{{ $boothNumbers }}">
+            {{ $boothNumbers }}
+        </div>
+    </div>
+
+    <!-- Column 5: Total Amount -->
+    <div class="bcard-col bcard-col--amount">
+        <div class="bcard-amount-val">
+            ${{ number_format($totalAmount, 2) }}
+        </div>
+    </div>
+
+    <!-- Column 6: Payment & Staff -->
+    <div class="bcard-col bcard-col--status-staff">
+        <div class="bcard-status-row">
+            @if($balanceAmount <= 0 || (int)$book->status === 2 || strtolower($statusName) === 'paid')
+                <span class="bcard-status-pill bcard-status-pill--paid">PAID</span>
+            @elseif($paidAmount > 0)
+                <span class="bcard-status-pill bcard-status-pill--partial" style="background-color: {{ $statusColor }}20; color: {{ $statusColor }};">PARTIAL</span>
+            @else
+                <span class="bcard-status-pill" style="background-color: {{ $statusColor }}20; color: {{ $statusColor }};">{{ strtoupper($statusName) }}</span>
+            @endif
+
+            @if($balanceAmount > 0 && $paidAmount > 0)
+                <span class="bcard-info-badge" title="Paid: ${{ number_format($paidAmount, 2) }} | Balance: ${{ number_format($balanceAmount, 2) }}">
+                    <i class="fas fa-info-circle text-warning"></i>
+                </span>
+            @elseif($balanceAmount <= 0 && $paidAmount > 0)
+                <span class="bcard-info-badge" title="Fully Paid">
+                    <i class="fas fa-info-circle text-success" style="opacity: 0.85;"></i>
+                </span>
+            @endif
+        </div>
+        @if($staff)
+            <div class="bcard-staff-row">
+                <div class="bcard-staff-avatar-wrap">
+                    <x-avatar
+                        :avatar="$staff->avatar"
+                        :name="$staff->username"
+                        size="22px"
+                        :type="$staff->isAdmin() ? 'admin' : 'user'"
+                        shape="circle"
+                    />
                 </div>
+                <span class="bcard-staff-name" title="{{ $staffName }}">{{ $staffName }}</span>
             </div>
-        @else
-            <span class="text-muted">N/A</span>
         @endif
     </div>
-
-    @if($floorPlanName !== '—')
-    <div class="books-booking-card__field">
-        <span class="books-booking-card__label">Floor plan</span>
-        <span class="books-booking-card__value" title="{{ $eventName ? 'Event: ' . $eventName : '' }}">
-            <i class="fas fa-map me-1" aria-hidden="true"></i>{{ $floorPlanName }}
-            @if($eventName)
-                <span class="books-booking-card__sub d-block">{{ Str::limit($eventName, 42) }}</span>
-            @endif
-        </span>
-    </div>
-    @endif
-
-    <div class="books-booking-card__grid">
-        <div>
-            <span class="books-booking-card__label">Date</span>
-            <div class="books-booking-card__value">{{ $book->date_book->format('M d, Y') }}</div>
-            <div class="books-booking-card__sub"><i class="fas fa-clock me-1" aria-hidden="true"></i>{{ $book->date_book->format('h:i A') }}</div>
-        </div>
-        <div>
-            <span class="books-booking-card__label">Booths</span>
-            <div class="books-booking-card__value"><i class="fas fa-cube me-1" aria-hidden="true"></i>{{ $boothCount }} {{ $boothCount == 1 ? 'Booth' : 'Booths' }}</div>
-            @if($boothNumbers !== '—')
-            <div class="books-booking-card__sub" title="{{ $boothNumbers }}">{{ Str::limit($boothNumbers, 36) }}</div>
-            @endif
-        </div>
-    </div>
-
-    <div class="books-booking-card__footer">
-        <div>
-            <span class="books-booking-card__label">Total</span>
-            <div class="books-amount-cell books-booking-card__amount">${{ number_format($totalAmount, 2) }}</div>
-        </div>
-        @if($balanceAmount > 0)
-        <div class="text-end">
-            <span class="books-booking-card__label">Balance</span>
-            <div class="books-booking-card__balance">${{ number_format($balanceAmount, 2) }}</div>
-        </div>
-        @else
-        <div class="text-end align-self-end">
-            <span class="status-badge status-badge-green">Paid</span>
-        </div>
-        @endif
-    </div>
-
-    @if($book->user)
-    <div class="books-booking-card__by">
-        <span class="books-booking-card__label me-2">Booked by</span>
-        <x-avatar
-            :avatar="$book->user->avatar"
-            :name="$book->user->username"
-            :size="'xs'"
-            :type="$book->user->isAdmin() ? 'admin' : 'user'"
-            :shape="'circle'"
-        />
-        <span class="books-booking-card__by-name">{{ $book->user->username }}</span>
-    </div>
-    @endif
 </div>
