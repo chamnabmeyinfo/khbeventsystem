@@ -60,13 +60,49 @@ class BookController extends Controller
         }
 
         $restrictToOwnBookings = $this->restrictToOwnBookings();
-        $floorPlans = FloorPlan::where('is_active', true)->orderBy('is_default', 'desc')->orderBy('name')->get();
-        $teamUsers = \App\Models\User::orderBy('username')->get(['id', 'username', 'name', 'avatar']);
-        $events = \Illuminate\Support\Facades\Schema::hasTable('events') ? \App\Models\Event::where('is_active', true)->orderBy('title')->get(['id', 'title']) : collect([]);
+        try {
+            $floorPlans = FloorPlan::where('is_active', true)->orderBy('is_default', 'desc')->orderBy('name')->get();
+        } catch (\Throwable $e) {
+            try {
+                $floorPlans = FloorPlan::orderBy('name')->get();
+            } catch (\Throwable $e2) {
+                $floorPlans = collect([]);
+            }
+        }
+
+        try {
+            $userCols = ['id', 'username'];
+            if (\Illuminate\SupportFacades\Schema::hasColumn('user', 'name')) {
+                $userCols[] = 'name';
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('user', 'avatar')) {
+                $userCols[] = 'avatar';
+            }
+            $teamUsers = \App\Models\User::orderBy('username')->get($userCols);
+        } catch (\Throwable $e) {
+            try {
+                $teamUsers = \App\Models\User::orderBy('username')->get(['id', 'username']);
+            } catch (\Throwable $e2) {
+                $teamUsers = collect([]);
+            }
+        }
+
+        try {
+            $events = \Illuminate\Support\Facades\Schema::hasTable('events')
+                ? \App\Models\Event::query()
+                    ->when(\Illuminate\Support\Facades\Schema::hasColumn('events', 'status'), function ($q) {
+                        $q->where('status', 1);
+                    })
+                    ->orderBy('title')
+                    ->get(['id', 'title'])
+                : collect([]);
+        } catch (\Throwable $e) {
+            $events = collect([]);
+        }
 
         try {
             $statusSettings = \App\Models\BookingStatusSetting::getActiveStatuses();
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $statusSettings = collect([]);
         }
 

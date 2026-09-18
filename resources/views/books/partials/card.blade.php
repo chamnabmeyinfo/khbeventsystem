@@ -53,6 +53,7 @@
 
     $staff = $book->user;
     $staffName = $staff ? ($staff->username ?: ($staff->name ?: 'Staff')) : '—';
+    $staffIsAdmin = $staff && method_exists($staff, 'isAdmin') ? $staff->isAdmin() : false;
 @endphp
 
 <div class="booking-card books-booking-card books-card-modern books-card-modern--type-{{ (int) $book->type }}" onclick="window.location='{{ route('books.show', $book) }}'">
@@ -169,10 +170,10 @@
             <div class="bcard-staff-row">
                 <div class="bcard-staff-avatar-wrap">
                     <x-avatar
-                        :avatar="$staff->avatar"
-                        :name="$staff->username"
+                        :avatar="$staff->avatar ?? null"
+                        :name="$staff->username ?? 'User'"
                         size="22px"
-                        :type="$staff->isAdmin() ? 'admin' : 'user'"
+                        :type="$staffIsAdmin ? 'admin' : 'user'"
                         shape="circle"
                     />
                 </div>

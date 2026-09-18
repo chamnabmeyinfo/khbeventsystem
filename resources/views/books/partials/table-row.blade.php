@@ -43,17 +43,18 @@
         @if($book->user)
             @php
                 $u = $book->user;
-                $uName = $u->display_name ?? $u->username;
+                $uName = $u ? ($u->display_name ?? $u->username) : 'User';
+                $uIsAdmin = $u && method_exists($u, 'isAdmin') ? $u->isAdmin() : false;
             @endphp
             <div class="books-team-cell">
                 @if(auth()->user()?->isAdmin() || \Illuminate\Support\Facades\Auth::guard('admin')->check())
                     <a href="{{ route('users.show', $u) }}" onclick="event.stopPropagation()" class="books-team-link" title="View Team Member: {{ $uName }} ({{ $u->username }})">
                         <div class="books-team-avatar-wrap">
                             <x-avatar
-                                :avatar="$u->avatar"
-                                :name="$u->username"
+                                :avatar="$u->avatar ?? null"
+                                :name="$u->username ?? 'User'"
                                 size="30px"
-                                :type="$u->isAdmin() ? 'admin' : 'user'"
+                                :type="$uIsAdmin ? 'admin' : 'user'"
                                 shape="circle"
                             />
                         </div>
@@ -64,10 +65,10 @@
                 @else
                     <div class="books-team-avatar-wrap">
                         <x-avatar
-                            :avatar="$u->avatar"
-                            :name="$u->username"
+                            :avatar="$u->avatar ?? null"
+                            :name="$u->username ?? 'User'"
                             size="30px"
-                            :type="$u->isAdmin() ? 'admin' : 'user'"
+                            :type="$uIsAdmin ? 'admin' : 'user'"
                             shape="circle"
                         />
                     </div>

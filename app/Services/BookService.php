@@ -20,7 +20,7 @@ class BookService
     public function getBookings(array $filters = [], int $perPage = 20, int $page = 1): array
     {
         $with = ['client', 'user', 'floorPlan', 'statusSetting'];
-        if (Schema::hasTable('events')) {
+        if (Schema::hasTable('events') && Schema::hasColumn('floor_plans', 'event_id')) {
             $with[] = 'floorPlan.event';
         }
 
@@ -186,8 +186,10 @@ class BookService
                     $sub->where('name', 'like', "%{$search}%")
                         ->orWhere('company', 'like', "%{$search}%");
                 })->orWhereHas('user', function ($sub) use ($search) {
-                    $sub->where('username', 'like', "%{$search}%")
-                        ->orWhere('name', 'like', "%{$search}%");
+                    $sub->where('username', 'like', "%{$search}%");
+                    if (Schema::hasColumn('user', 'name')) {
+                        $sub->orWhere('name', 'like', "%{$search}%");
+                    }
                 });
                 if (is_numeric($cleanId)) {
                     $q->orWhere('id', (int) $cleanId);
@@ -225,9 +227,11 @@ class BookService
         // Event filter
         if (! empty($filters['event_id'])) {
             $eventId = $filters['event_id'];
-            $query->whereHas('floorPlan', function ($fpQuery) use ($eventId) {
-                $fpQuery->where('event_id', $eventId);
-            });
+            if (Schema::hasTable('events') && Schema::hasColumn('floor_plans', 'event_id')) {
+                $query->whereHas('floorPlan', function ($fpQuery) use ($eventId) {
+                    $fpQuery->where('event_id', $eventId);
+                });
+            }
         }
 
         // Status filter

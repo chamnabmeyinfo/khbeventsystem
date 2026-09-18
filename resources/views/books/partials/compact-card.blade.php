@@ -37,9 +37,9 @@
         </div>
         <div class="compact-card-row">
             <i class="fas fa-calendar"></i>
-            <span>{{ $book->date_book->format('M d, Y') }}</span>
+            <span>{{ $book->date_book ? $book->date_book->format('M d, Y') : '—' }}</span>
             <i class="fas fa-clock ml-2"></i>
-            <span>{{ $book->date_book->format('h:i A') }}</span>
+            <span>{{ $book->date_book ? $book->date_book->format('h:i A') : '—' }}</span>
         </div>
         <div class="compact-card-row">
             <i class="fas fa-dollar-sign"></i>
@@ -53,10 +53,10 @@
         <div class="compact-card-row">
             @if($book->user)
             <x-avatar 
-                :avatar="$book->user->avatar" 
-                :name="$book->user->username" 
+                :avatar="$book->user->avatar ?? null" 
+                :name="$book->user->username ?? 'User'" 
                 :size="'xs'" 
-                :type="$book->user->isAdmin() ? 'admin' : 'user'"
+                :type="($book->user && method_exists($book->user, 'isAdmin') && $book->user->isAdmin()) ? 'admin' : 'user'"
                 :shape="'circle'"
             />
             <span style="font-size: 0.75rem; color: #6b7280;">{{ $book->user->username }}</span>
@@ -69,7 +69,7 @@
             <button type="button" class="btn btn-info btn-sm" onclick="showBookingInfo({{ $book->id }})" title="View">
                 <i class="fas fa-eye"></i>
             </button>
-            @if(auth()->user()->isAdmin())
+            @if(auth()->user()?->isAdmin() || \Illuminate\Support\Facades\Auth::guard('admin')->check())
             <button type="button" class="btn btn-danger btn-sm" onclick="deleteBooking({{ $book->id }})" title="Delete">
                 <i class="fas fa-trash"></i>
             </button>

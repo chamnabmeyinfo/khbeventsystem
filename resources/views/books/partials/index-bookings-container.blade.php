@@ -8,7 +8,17 @@
                 <h5>
                     <span>
                         <i class="fas fa-layer-group me-2"></i>
-                        {{ $groupBy === 'name' ? $groupKey : \Carbon\Carbon::parse($groupKey)->format('F d, Y') }}
+                        @php
+                            $groupTitle = $groupKey;
+                            if ($groupBy !== 'name' && !empty($groupKey)) {
+                                try {
+                                    $groupTitle = \Carbon\Carbon::parse($groupKey)->format('F d, Y');
+                                } catch (\Throwable $e) {
+                                    $groupTitle = $groupKey;
+                                }
+                            }
+                        @endphp
+                        {{ $groupTitle }}
                     </span>
                     <span class="badge bg-secondary">{{ count($groupBooks) }} bookings</span>
                 </h5>
