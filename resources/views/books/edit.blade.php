@@ -181,9 +181,11 @@
                                 </label>
                                 <select class="form-control @error('userid') is-invalid @enderror" id="userid" name="userid">
                                     @foreach($users as $u)
+                                        @if(!method_exists($u, 'isActive') || $u->isActive() || (string) old('userid', $book->userid) === (string) $u->id)
                                         <option value="{{ $u->id }}" {{ (string) old('userid', $book->userid) === (string) $u->id ? 'selected' : '' }}>
                                             {{ $u->username }} ({{ $u->isAdmin() ? 'Admin' : ($u->role ? $u->role->name : 'Staff') }})
                                         </option>
+                                        @endif
                                     @endforeach
                                 </select>
                                 @error('userid')

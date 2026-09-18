@@ -177,6 +177,20 @@ class User extends Authenticatable
     }
 
     /**
+     * Scope query to only include active users (and users without inactive/terminated/suspended employees)
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('status', 1)
+            ->where(function ($q) {
+                $q->whereDoesntHave('employee')
+                    ->orWhereHas('employee', function ($empQ) {
+                        $empQ->whereNotIn('status', ['inactive', 'terminated', 'suspended']);
+                    });
+            });
+    }
+
+    /**
      * Demo / sandbox login (training, QA, seeded demo data).
      */
     public function isDemoAccount(): bool

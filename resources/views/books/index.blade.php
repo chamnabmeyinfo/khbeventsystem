@@ -150,9 +150,11 @@
                     <select name="user_id" class="form-control form-control-modern form-control-sm">
                         <option value="">All Team Members</option>
                         @foreach($teamUsers ?? [] as $tUser)
+                            @if(!method_exists($tUser, 'isActive') || $tUser->isActive())
                             <option value="{{ $tUser->id }}" {{ request('user_id') == (string)$tUser->id ? 'selected' : '' }}>
                                 {{ $tUser->name ?? $tUser->username }} ({{ $tUser->username }})
                             </option>
+                            @endif
                         @endforeach
                     </select>
                 </div>

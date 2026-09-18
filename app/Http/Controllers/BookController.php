@@ -78,12 +78,16 @@ class BookController extends Controller
             if (\Illuminate\Support\Facades\Schema::hasColumn('user', 'avatar')) {
                 $userCols[] = 'avatar';
             }
-            $teamUsers = \App\Models\User::orderBy('username')->get($userCols);
+            $teamUsers = \App\Models\User::active()->orderBy('username')->get($userCols);
         } catch (\Throwable $e) {
             try {
-                $teamUsers = \App\Models\User::orderBy('username')->get(['id', 'username']);
+                $teamUsers = \App\Models\User::active()->orderBy('username')->get(['id', 'username']);
             } catch (\Throwable $e2) {
-                $teamUsers = collect([]);
+                try {
+                    $teamUsers = \App\Models\User::where('status', 1)->orderBy('username')->get(['id', 'username']);
+                } catch (\Throwable $e3) {
+                    $teamUsers = collect([]);
+                }
             }
         }
 
@@ -607,14 +611,14 @@ class BookController extends Controller
                 ],
             ]);
             $users = auth()->check() && auth()->user()->isAdmin()
-                ? User::where('status', 1)->orderBy('username')->get()
+                ? User::active()->orderBy('username')->get()
                 : collect([]);
 
             return view('books.show', compact('book', 'booths', 'payments', 'statusSettings', 'users'));
         }
 
         $users = auth()->check() && auth()->user()->isAdmin()
-            ? User::where('status', 1)->orderBy('username')->get()
+            ? User::active()->orderBy('username')->get()
             : collect([]);
 
         return view('books.show', compact('book', 'booths', 'payments', 'statusSettings', 'users'));
@@ -709,7 +713,7 @@ class BookController extends Controller
         $allBooths = Booth::orderBy('booth_number')->get();
         $categories = Category::where('status', 1)->orderBy('name')->get();
         $users = auth()->check() && auth()->user()->isAdmin()
-            ? User::where('status', 1)->orderBy('username')->get()
+            ? User::active()->orderBy('username')->get()
             : collect([]);
 
         return view('books.edit', compact('book', 'clients', 'allBooths', 'currentBooths', 'boothIds', 'categories', 'users'));
