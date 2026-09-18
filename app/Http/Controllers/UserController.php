@@ -299,6 +299,18 @@ class UserController extends Controller
 
         $user->update($validated);
 
+        // Synchronize linked employee status if user status changed
+        if (isset($validated['status'])) {
+            $linkedEmployee = $user->employee;
+            if ($linkedEmployee) {
+                if ($validated['status'] == 0 && in_array($linkedEmployee->status, ['active', 'on-leave'])) {
+                    $linkedEmployee->update(['status' => 'inactive']);
+                } elseif ($validated['status'] == 1 && $linkedEmployee->status === 'inactive') {
+                    $linkedEmployee->update(['status' => 'active']);
+                }
+            }
+        }
+
         $this->syncLinkedEmployeesAccountKind($user->fresh());
 
         return redirect()->route('users.show', $user)
@@ -350,6 +362,16 @@ class UserController extends Controller
         }
 
         $user->save();
+
+        // Synchronize linked employee status
+        $linkedEmployee = $user->employee;
+        if ($linkedEmployee) {
+            if ($user->status == 0 && in_array($linkedEmployee->status, ['active', 'on-leave'])) {
+                $linkedEmployee->update(['status' => 'inactive']);
+            } elseif ($user->status == 1 && $linkedEmployee->status === 'inactive') {
+                $linkedEmployee->update(['status' => 'active']);
+            }
+        }
 
         return response()->json([
             'status' => 200,

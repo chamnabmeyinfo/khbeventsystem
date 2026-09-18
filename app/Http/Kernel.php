@@ -36,6 +36,7 @@ class Kernel extends HttpKernel
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \App\Http\Middleware\SecurityHeaders::class,
             \App\Http\Middleware\EnsureUploadsEnabled::class,
+            \App\Http\Middleware\EnsureStaffIsActive::class,
         ],
 
         'api' => [
@@ -66,5 +67,6 @@ class Kernel extends HttpKernel
         'client.portal' => \App\Http\Middleware\ClientPortal::class,
         'permission' => \App\Http\Middleware\CheckPermission::class,
         'landing.gate' => \App\Http\Middleware\ApplyLandingPageGate::class,
+        'active.staff' => \App\Http\Middleware\EnsureStaffIsActive::class,
     ];
 }

@@ -138,7 +138,42 @@ class User extends Authenticatable
     {
         $status = $this->status ?? $this->attributes['status'] ?? null;
 
-        return $status === '1' || $status === 1;
+        if (! ($status === '1' || $status === 1)) {
+            return false;
+        }
+
+        // Also check if linked employee is inactive, terminated, or suspended
+        if ($this->relationLoaded('employee')) {
+            if ($this->employee && in_array(strtolower($this->employee->status ?? ''), ['inactive', 'terminated', 'suspended'])) {
+                return false;
+            }
+        } else {
+            $employee = $this->employee()->first();
+            if ($employee && in_array(strtolower($employee->status ?? ''), ['inactive', 'terminated', 'suspended'])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Check if user or linked employee is terminated
+     */
+    public function isTerminated(): bool
+    {
+        if ($this->relationLoaded('employee')) {
+            if ($this->employee && strtolower($this->employee->status ?? '') === 'terminated') {
+                return true;
+            }
+        } else {
+            $employee = $this->employee()->first();
+            if ($employee && strtolower($employee->status ?? '') === 'terminated') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -278,6 +313,11 @@ class User extends Authenticatable
      */
     public function hasPermission($permissionSlug): bool
     {
+        // Inactive or terminated staff have NO permissions anywhere
+        if (! $this->isActive()) {
+            return false;
+        }
+
         // Admin always has all permissions
         if ($this->isAdmin()) {
             return true;

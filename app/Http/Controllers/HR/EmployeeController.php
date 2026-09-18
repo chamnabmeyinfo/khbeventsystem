@@ -281,6 +281,13 @@ class EmployeeController extends Controller
 
         $employee->update($validated);
 
+        // Synchronize linked user account status
+        $linkedUserId = $validated['user_id'] ?? $employee->user_id;
+        if ($linkedUserId) {
+            $userStatus = ($validated['status'] === 'active') ? 1 : 0;
+            User::where('id', $linkedUserId)->update(['status' => $userStatus]);
+        }
+
         return redirect()->route('hr.employees.show', $employee)
             ->with('success', 'Employee updated successfully.');
     }
@@ -294,6 +301,10 @@ class EmployeeController extends Controller
         if ($employee->attendance()->count() > 0 || $employee->leaveRequests()->count() > 0) {
             return redirect()->route('hr.employees.show', $employee)
                 ->with('error', 'Cannot delete employee with existing records. Please terminate instead.');
+        }
+
+        if ($employee->user_id) {
+            User::where('id', $employee->user_id)->update(['status' => 0]);
         }
 
         $employee->delete();

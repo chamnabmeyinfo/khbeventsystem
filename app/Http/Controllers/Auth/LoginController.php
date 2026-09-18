@@ -53,8 +53,8 @@ class LoginController extends Controller
             'password' => 'required|string',
         ]);
 
-        // Load user with role and permissions to prevent N+1 queries
-        $user = User::with('role.permissions')->where('username', $request->username)->first();
+        // Load user with role, permissions, and employee to prevent N+1 queries
+        $user = User::with(['role.permissions', 'employee'])->where('username', $request->username)->first();
 
         if (! $user) {
             return back()->withErrors([
@@ -62,9 +62,15 @@ class LoginController extends Controller
             ])->withInput();
         }
 
+        if ($user->isTerminated()) {
+            return back()->withErrors([
+                'username' => 'This account has been terminated. Access to the system is strictly prohibited.',
+            ])->withInput();
+        }
+
         if (! $user->isActive()) {
             return back()->withErrors([
-                'username' => 'Account is inactive.',
+                'username' => 'This account is inactive or suspended. Access to the system is not permitted.',
             ])->withInput();
         }
 
