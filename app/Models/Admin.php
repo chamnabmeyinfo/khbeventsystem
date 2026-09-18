@@ -70,4 +70,12 @@ class Admin extends Authenticatable
     {
         return 'username';
     }
+
+    /**
+     * Check if user is admin
+     */
+    public function isAdmin(): bool
+    {
+        return true;
+    }
 }

@@ -289,8 +289,12 @@
                     <div class="books-show-detail-row">
                         <span class="books-show-detail-label"><i class="fas fa-calendar me-2"></i>Date &amp; time</span>
                         <span class="books-show-detail-value">
+                            @if($book->date_book)
                             {{ $book->date_book->format('M d, Y') }}<br>
                             <small class="text-muted fw-normal">{{ $book->date_book->format('h:i A') }}</small>
+                        @else
+                            <span class="text-muted">N/A</span>
+                        @endif
                         </span>
                     </div>
                     <div class="books-show-detail-row align-items-center">

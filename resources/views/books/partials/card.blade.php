@@ -66,7 +66,7 @@
                 <button type="button" class="bcard-btn-action bcard-btn-action--view plastic-btn-press" onclick="showBookingInfo({{ $book->id }})" title="Quick view">
                     <i class="fas fa-eye" aria-hidden="true"></i>
                 </button>
-                @if(auth()->user()->isAdmin())
+@if(auth()->user()?->isAdmin() || \Illuminate\Support\Facades\Auth::guard('admin')->check())
                 <button type="button" class="bcard-btn-action bcard-btn-action--delete plastic-btn-press" onclick="deleteBooking({{ $book->id }})" title="Delete booking">
                     <i class="fas fa-trash-alt" aria-hidden="true"></i>
                 </button>

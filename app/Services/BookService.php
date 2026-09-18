@@ -80,7 +80,7 @@ class BookService
             }
         } elseif ($groupBy === 'date' && $books->count() > 0) {
             foreach ($books as $book) {
-                $groupKey = $book->date_book->format('Y-m-d');
+                $groupKey = $book->date_book ? $book->date_book->format('Y-m-d') : 'No Date';
                 if (! isset($groupedBooks[$groupKey])) {
                     $groupedBooks[$groupKey] = [];
                 }
@@ -431,7 +431,16 @@ class BookService
      */
     private function restrictToOwnBookings(): bool
     {
-        if (auth()->user()->isAdmin()) {
+        if (\Illuminate\Support\Facades\Auth::guard('admin')->check()) {
+            return false;
+        }
+
+        if (! auth()->check()) {
+            return false;
+        }
+
+        $user = auth()->user();
+        if ($user instanceof \App\Models\Admin || (method_exists($user, 'isAdmin') && $user->isAdmin())) {
             return false;
         }
 

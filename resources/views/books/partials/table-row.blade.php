@@ -46,7 +46,7 @@
                 $uName = $u->display_name ?? $u->username;
             @endphp
             <div class="books-team-cell">
-                @if(auth()->user()->isAdmin())
+                @if(auth()->user()?->isAdmin() || \Illuminate\Support\Facades\Auth::guard('admin')->check())
                     <a href="{{ route('users.show', $u) }}" onclick="event.stopPropagation()" class="books-team-link" title="View Team Member: {{ $uName }} ({{ $u->username }})">
                         <div class="books-team-avatar-wrap">
                             <x-avatar
@@ -80,7 +80,7 @@
             <span class="text-muted small">—</span>
         @endif
     </td>
-    <td class="books-col-floorplan">
+<td class="books-col-floorplan">
         <div class="text-truncate" title="{{ $eventName ? 'Event: ' . $eventName : $floorPlanName }}">{{ $floorPlanName }}</div>
         @if($eventName)
         <small class="text-muted text-truncate d-block" title="{{ $eventName }}">{{ $eventName }}</small>
@@ -116,7 +116,7 @@
             <button type="button" class="books-table-btn plastic-btn-press" onclick="showBookingInfo({{ $book->id }})" title="Quick view">
                 <i class="fas fa-eye" aria-hidden="true"></i>
             </button>
-            @if(auth()->user()->isAdmin())
+            @if(auth()->user()?->isAdmin() || \Illuminate\Support\Facades\Auth::guard('admin')->check())
             <button type="button" class="books-table-btn books-table-btn-danger plastic-btn-press" onclick="deleteBooking({{ $book->id }})" title="Delete booking">
                 <i class="fas fa-trash" aria-hidden="true"></i>
             </button>

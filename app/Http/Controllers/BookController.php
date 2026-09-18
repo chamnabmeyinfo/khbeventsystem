@@ -1553,10 +1553,16 @@ class BookController extends Controller
      */
     private function restrictToOwnBookings(): bool
     {
+        if (\Illuminate\Support\Facades\Auth::guard('admin')->check()) {
+            return false;
+        }
+
         if (! auth()->check()) {
             return false;
         }
-        if (auth()->user()->isAdmin()) {
+
+        $user = auth()->user();
+        if ($user instanceof \App\Models\Admin || (method_exists($user, 'isAdmin') && $user->isAdmin())) {
             return false;
         }
 

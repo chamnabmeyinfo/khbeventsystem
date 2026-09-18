@@ -36,7 +36,7 @@
             <button type="button" class="action-btn action-btn-secondary" onclick="refreshPage()">
                 <i class="fas fa-sync-alt"></i> Refresh
             </button>
-            @if(auth()->user()->isAdmin())
+            @if(auth()->user()?->isAdmin() || \Illuminate\Support\Facades\Auth::guard('admin')->check())
             <button type="button" class="action-btn action-btn-secondary" style="border-color: rgba(229, 62, 62, 0.35); color: #c53030;" onclick="showDeleteAllModal()">
                 <i class="fas fa-trash-alt"></i> Delete all
             </button>
